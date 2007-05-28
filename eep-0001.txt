@@ -1,0 +1,408 @@
+EEP: 1
+Title: EEP Purpose and Guidelines
+Version: $Revision: 11 $
+Last-Modified: $Date: 2007-01-31 17:14:17 +0100 (Wed, 31 Jan 2007) $
+Author: Per Gustafsson <pergu@it.uu.se>
+Status: Draft
+Type: Process
+Content-Type: text/x-rst
+Created: 29-Jan-2007
+Post-History: 29-Jan-2007
+
+
+What is a EEP?
+==============
+
+EEP stands for Erlang Enhancement Proposal. It is a concept borrowed
+from the Python language [1]_ to facilitate community involvement in
+developing Erlang. This document is heavily based on PEP 1 [2]_. An EEP is
+a design document providing information to the Erlang community, or
+describing a new feature for Erlang or its processes or environment.
+The EEP should provide a concise technical specification of the
+feature and a rationale for the feature.
+
+We intend EEPs to be the primary mechanisms for proposing new
+features, for collecting community input on an issue, and for
+documenting the design decisions that have gone into Erlang.  The EEP
+author is responsible for building consensus within the community and
+documenting dissenting opinions.
+
+Because the EEPs are maintained as text files in a versioned
+repository, their revision history is the historical record of the
+feature proposal [3]_.
+
+
+EEP Types
+=========
+
+There are three kinds of EEP:
+
+1. A **Standards Track** EEP describes a new feature or implementation
+   for Erlang.
+
+2. An **Informational** EEP describes a Erlang design issue, or
+   provides general guidelines or information to the Erlang community,
+   but does not propose a new feature.  Informational EEPs do not
+   necessarily represent a Erlang community consensus or
+   recommendation, so users and implementors are free to ignore
+   Informational EEPs or follow their advice.
+
+3. A **Process** EEP describes a process surrounding Erlang, or
+   proposes a change to (or an event in) a process.  Process EEPs are
+   like Standards Track EEPs but apply to areas other than the Erlang
+   language itself.  They may propose an implementation, but not to
+   Erlang's codebase; they often require community consensus; unlike
+   Informational EEPs, they are more than recommendations, and users
+   are typically not free to ignore them.  Examples include release
+   schedules, procedures, guidelines, changes to the decision-making
+   process, and changes to the tools or environment used in Erlang
+   development.
+
+
+EEP Work Flow
+=============
+
+The EEP editors assign EEP numbers and change their status.  The
+current EEP editors are XX and YY.  Please send
+all EEP-related email to <eeps@erlang.org>.
+
+The EEP process begins with a new idea for Erlang.  It is highly
+recommended that a single EEP contain a single key proposal or new
+idea.  The more focused the EEP, the more successful it tends to
+be.  The EEP editor reserves the right to reject EEP proposals if they
+appear too unfocused or too broad.  If in doubt, split your EEP into
+several well-focused ones.
+
+Each EEP must have a champion -- someone who writes the EEP using the
+style and format described below, shepherds the discussions in the
+appropriate forums, and attempts to build community consensus around
+the idea.  The EEP champion (a.k.a. Author) should first attempt to
+ascertain whether the idea is EEP-able.  Posting to the
+erlang-questions@erlang.org mailing list is recommended.  Small
+enhancements or patches often don't need a EEP and can be injected
+into the Erlang development work flow by sending a patch to
+erlang-patches@erlang.org.
+
+The EEP champion then emails the EEP editor <eeps@erlang.org> with a
+proposed title and a rough, but fleshed out, draft of the EEP.  This
+draft must be written in EEP style as described below.
+
+If the EEP editor approves, he will assign the EEP a number, label it
+as Standards Track, Informational, or Process, give it status "Draft",
+and create and check-in the initial draft of the EEP.  The EEP editor
+will not unreasonably deny a EEP.  Reasons for denying EEP status
+include duplication of effort, being technically unsound, not
+providing proper motivation or addressing backwards compatibility, or
+not in keeping with the Erlang philosophy.
+
+If a pre-EEP is rejected, the author may elect to take the pre-EEP to
+the erlang-questions@erlang.org mailing list to help flesh it out,
+gain feedback and consensus from the community at large, and improve
+the EEP for re-submission.
+
+The author of the EEP is then responsible for posting the EEP to the
+community forums, and marshaling community support for it.  As updates
+are necessary, the EEP author can check in new versions if they have
+SVN commit permissions, or can email new EEP versions to the EEP
+editor for committing.
+
+Standards Track EEPs consist of two parts, a design document and a
+reference implementation.  The EEP should be reviewed and accepted
+before a reference implementation is begun, unless a reference
+implementation will aid people in studying the EEP.  Standards Track
+EEPs must include an implementation -- in the form of code, a patch,
+or a URL to same -- before it can be considered Final.
+
+EEP authors are responsible for collecting community feedback on a EEP
+before submitting it for review.  A EEP that has not been discussed on
+the erlang mailing list will not be
+accepted.  However, wherever possible, long open-ended discussions on
+public mailing lists should be avoided.  Strategies to keep the
+discussions efficient include: setting up a separate SIG mailing list
+for the topic, having the EEP author accept private comments in the
+early design phases, setting up a wiki page, etc.  EEP authors should
+use their discretion here.
+
+Once the authors have completed a EEP, they must inform the EEP editor
+that it is ready for review.  EEPs are reviewed by the Erlang/OTP team
+and their chosen consultants, who may accept or reject a EEP or send
+it back to the author(s) for revision.  For a EEP that is
+pre-determined to be acceptable (e.g., it is an obvious win as-is
+and/or its implementation has already been checked in) the Erlang/OTP
+team may also initiate a EEP review, first notifying the EEP author(s)
+and giving them a chance to make revisions.
+
+For a EEP to be accepted it must meet certain minimum criteria.  It
+must be a clear and complete description of the proposed enhancement.
+The enhancement must represent a net improvement.  The proposed
+implementation, if applicable, must be solid and must not complicate
+the interpreter unduly.  Finally, a proposed enhancement must be
+compatible with the Erlang philosophy in order to be accepted.
+
+Once a EEP has been accepted, the reference implementation must be
+completed.  When the reference implementation is complete and
+accepted, the status will be changed to "Final".
+
+A EEP can also be assigned status "Deferred".  The EEP author or
+editor can assign the EEP this status when no progress is being made
+on the EEP.  Once a EEP is deferred, the EEP editor can re-assign it
+to draft status.
+
+A EEP can also be "Rejected".  Perhaps after all is said and done it
+was not a good idea.  It is still important to have a record of this
+fact.
+
+EEPs can also be replaced by a different EEP, rendering the original
+obsolete.  This is intended for Informational EEPs, where version 2 of
+an API can replace version 1.
+
+EEP work flow is as follows:
+
+.. image:: eep-0001-1.png
+
+Some Informational and Process EEPs may also have a status of "Active"
+if they are never meant to be completed.  E.g. EEP 1 (this EEP).
+
+
+What belongs in a successful EEP?
+=================================
+
+Each EEP should have the following parts:
+
+1. Preamble -- RFC 822 style headers containing meta-data about the
+   EEP, including the EEP number, a short descriptive title (limited
+   to a maximum of 44 characters), the names, and optionally the
+   contact info for each author, etc.
+
+2. Abstract -- a short (~200 word) description of the technical issue
+   being addressed.
+
+3. Copyright/public domain -- Each EEP must either be explicitly
+   labelled as placed in the public domain (see this EEP as an
+   example) or licensed under the `Open Publication License`_.
+
+4. Specification -- The technical specification should describe the
+   syntax and semantics of any new language feature.  The
+   specification should be detailed enough to allow competing,
+   interoperable implementations.
+
+5. Motivation -- The motivation is critical for EEPs that want to
+   change the Erlang language.  It should clearly explain why the
+   existing language specification is inadequate to address the
+   problem that the EEP solves.  EEP submissions without sufficient
+   motivation may be rejected outright.
+
+6. Rationale -- The rationale fleshes out the specification by
+   describing what motivated the design and why particular design
+   decisions were made.  It should describe alternate designs that
+   were considered and related work, e.g. how the feature is supported
+   in other languages.
+
+   The rationale should provide evidence of consensus within the
+   community and discuss important objections or concerns raised
+   during discussion.
+
+7. Backwards Compatibility -- All EEPs that introduce backwards
+   incompatibilities must include a section describing these
+   incompatibilities and their severity.  The EEP must explain how the
+   author proposes to deal with these incompatibilities.  EEP
+   submissions without a sufficient backwards compatibility treatise
+   may be rejected outright.
+
+8. Reference Implementation -- The reference implementation must be
+   completed before any EEP is given status "Final", but it need not
+   be completed before the EEP is accepted.  It is better to finish
+   the specification and rationale first and reach consensus on it
+   before writing code.
+
+   The final implementation must include test code and documentation
+   appropriate for either the Erlang language reference or the
+   standard library reference.
+
+
+EEP Formats and Templates
+=========================
+
+There are two EEP formats available to authors: plaintext and
+reStructuredText_.  Both are UTF-8-encoded text files.
+
+Plaintext EEPs are written with minimal structural markup that adheres
+to a rigid style.  EEP 2 contains a instructions and a template [4]_
+you can use to get started writing your plaintext EEP.
+
+ReStructuredText_ EEPs allow for rich markup that is still quite easy
+to read, but results in much better-looking and more functional HTML.
+EEP 3 contains instructions and a template [5]_ for reStructuredText
+EEPs.
+
+There is a Python script that converts both styles of EEPs to HTML for
+viewing on the web [6]_.  Parsing and conversion of plaintext EEPs is
+self-contained within the script.  reStructuredText EEPs are parsed
+and converted by Docutils_ code called from the script.
+
+
+EEP Header Preamble
+===================
+
+Each EEP must begin with an RFC 822 style header preamble.  The headers
+must appear in the following order.  Headers marked with "*" are
+optional and are described below.  All other headers are required. ::
+
+    EEP: <eep number>
+    Title: <eep title>
+    Version: <svn version string>
+    Last-Modified: <svn date string>
+    Author: <list of authors' real names and optionally, email addrs>
+  * Discussions-To: <email address>
+    Status: <Draft | Active | Accepted | Deferred | Rejected |
+             Final | Replaced>
+    Type: <Standards Track | Informational | Process>
+  * Content-Type: <text/plain | text/x-rst>
+  * Requires: <eep numbers>
+    Created: <date created on, in dd-mmm-yyyy format>
+  * Erlang-Version: <version number>
+    Post-History: <dates of postings to erlang-questions>
+  * Replaces: <eep number>
+  * Replaced-By: <eep number>
+
+The Author header lists the names, and optionally the email addresses
+of all the authors/owners of the EEP.  The format of the Author header
+value must be
+
+    Random J. User <address@dom.ain>
+
+if the email address is included, and just
+
+    Random J. User
+
+if the address is not given.
+
+If there are multiple authors, each should be on a separate line
+following RFC 2822 continuation line conventions.  Note that personal
+email addresses in EEPs will be obscured as a defense against spam
+harvesters.
+
+While a EEP is in private discussions (usually during the initial
+Draft phase), a Discussions-To header will indicate the mailing list
+or URL where the EEP is being discussed.  No Discussions-To header is
+necessary if the EEP is being discussed privately with the author, or
+on the erlang mailing list.  Note that email
+addresses in the Discussions-To header will not be obscured.
+
+The Type header specifies the type of EEP: Standards Track,
+Informational, or Process.
+
+The format of a EEP is specified with a Content-Type header.  The
+acceptable values are "text/plain" for plaintext EEPs (see EEP 2 [3]_)
+and "text/x-rst" for reStructuredText EEPs (see EEP 3 [4]_).
+Plaintext ("text/plain") is the default if no Content-Type header is
+present.
+
+The Created header records the date that the EEP was assigned a
+number, while Post-History is used to record the dates of when new
+versions of the EEP are posted to erlang-questions.  Both
+headers should be in dd-mmm-yyyy format, e.g. 14-Aug-2006.
+
+Standards Track EEPs must have a Erlang-Version header which indicates
+the version of Erlang that the feature will be released with.
+Informational and Process EEPs do not need a Erlang-Version header.
+
+EEPs may have a Requires header, indicating the EEP numbers that this
+EEP depends on.
+
+EEPs may also have a Replaced-By header indicating that a EEP has been
+rendered obsolete by a later document; the value is the number of the
+EEP that replaces the current document.  The newer EEP must have a
+Replaces header containing the number of the EEP that it rendered
+obsolete.
+
+
+Auxiliary Files
+===============
+
+EEPs may include auxiliary files such as diagrams.  Such files must be
+named ``eep-XXXX-Y.ext``, where "XXXX" is the EEP number, "Y" is a
+serial number (starting at 1), and "ext" is replaced by the actual
+file extension (e.g. "png").
+
+
+Reporting EEP Bugs, or Submitting EEP Updates
+=============================================
+
+How you report a bug, or submit a EEP update depends on several
+factors, such as the maturity of the EEP, the preferences of the EEP
+author, and the nature of your comments.  For the early draft stages
+of the EEP, it's probably best to send your comments and changes
+directly to the EEP author.  For more mature, or finished EEPs you may
+want to submit corrections to the erlang-patches mailing list.
+
+When in doubt about where to send your changes, please check first
+with the EEP author and/or EEP editor.
+
+EEP authors can update EEPs by submitting new versions to the editors.
+
+
+Transferring EEP Ownership
+==========================
+
+It occasionally becomes necessary to transfer ownership of EEPs to a
+new champion.  In general, we'd like to retain the original author as
+a co-author of the transferred EEP, but that's really up to the
+original author.  A good reason to transfer ownership is because the
+original author no longer has the time or interest in updating it or
+following through with the EEP process, or has fallen off the face of
+the 'net (i.e. is unreachable or not responding to email).  A bad
+reason to transfer ownership is because you don't agree with the
+direction of the EEP.  We try to build consensus around a EEP, but if
+that's not possible, you can always submit a competing EEP.
+
+If you are interested in assuming ownership of a EEP, send a message
+asking to take over, addressed to both the original author and the EEP
+editor <eeps@erlang.org>.  If the original author doesn't respond to
+email in a timely manner, the EEP editor will make a unilateral
+decision (it's not like such decisions can't be reversed :).
+
+
+References and Footnotes
+========================
+
+.. [1] We are very grateful to the Python community for devising such
+   a good process for language revisions and for placing their documents
+   in the public domain.
+
+.. [2] PEP 1, PEP Purpose and Guidelines, Goodger, Hylton, Warsaw
+   (http://www.python.org/dev/peps/pep-0001)
+
+.. [3] This svn server has not been setup yet but should be setup
+
+.. [4] EEP 2, Sample Plaintext EEP Template, Gustafsson
+   (http://www.erlang.org/eeps/eep-0002)
+
+.. [5] EEP 3, Sample reStructuredText EEP Template, Gustafsson
+   (http://www.erlang.org/eeps/eep-0003)
+
+.. [6] The script referred to here eep2html.py, which is a hack we
+   need someone to make good tool support for EEPs and we also need an
+   address for EEPs on the web.
+
+.. _Open Publication License: http://www.opencontent.org/openpub/
+
+.. _reStructuredText: http://docutils.sourceforge.net/rst.html
+
+.. _Docutils: http://docutils.sourceforge.net/
+
+
+Copyright
+=========
+
+This document has been placed in the public domain.
+
+
+..
+   Local Variables:
+   mode: indented-text
+   indent-tabs-mode: nil
+   sentence-end-double-space: t
+   fill-column: 70
+   coding: utf-8
+   End:
