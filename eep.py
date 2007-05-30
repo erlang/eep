@@ -1,16 +1,22 @@
-# $Id: pep.py 4564 2006-05-21 20:44:42Z felixwiemann $
-# Author: David Goodger <goodger@python.org>
+# Author: David Goodger
+# Contact: goodger@users.sourceforge.net
+# Revision: $Revision: 3892 $
+# Date: $Date: 2005-09-20 22:04:53 +0200 (Tue, 20 Sep 2005) $
 # Copyright: This module has been placed in the public domain.
+# 
+# Converted to EEP reader by raimo@erix.ericsson.se
+# by example from Per Gustafsson
 
 """
-Python Enhancement Proposal (PEP) Reader.
+Erlang Enhancement Proposal (EEP) Reader.
 """
 
 __docformat__ = 'reStructuredText'
 
 
 from docutils.readers import standalone
-from docutils.transforms import eeps, references, misc, frontmatter
+from docutils.transforms import references, misc, frontmatter
+import eeps
 from docutils.parsers import rst
 
 

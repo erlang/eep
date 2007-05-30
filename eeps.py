@@ -1,6 +1,12 @@
-# $Id: peps.py 4564 2006-05-21 20:44:42Z felixwiemann $
-# Author: David Goodger <goodger@python.org>
+# Author: David Goodger
+# Contact: goodger@users.sourceforge.net
+# Revision: $Revision: 3909 $
+# Date: $Date: 2005-09-26 20:17:31 +0200 (Mon, 26 Sep 2005) $
 # Copyright: This module has been placed in the public domain.
+# 
+# Converted to EEP transfoorm by raimo@erix.ericsson.se
+# by example from Per Gustafsson
+
 
 """
 Transforms for EEP processing.
@@ -32,7 +38,6 @@ class Headers(Transform):
     default_priority = 360
 
     pep_url = 'eep-%04d.html'
-    ppep_url = 'pep-%04d'
     rcs_keyword_substitutions = (
           (re.compile(r'\$' r'RCSfile: (.+),v \$$', re.IGNORECASE), r'\1'),
           (re.compile(r'\$[a-zA-Z]+: (.+) \$$'), r'\1'),)
@@ -273,8 +278,10 @@ class PEPZeroSpecial(nodes.SparseNodeVisitor):
 
 
 non_masked_addresses = ('eeps@erlang.org',
-                        'erlang-questions@erlang.org',
-                        'erlang-patches@erlang.org')
+                        'erlang-announce@erlang.org',
+                        'erlang-bugs@erlang.org',
+                        'erlang-patches@erlang.org',
+                        'erlang-questions@erlang.org')
 
 def mask_email(ref, pepno=None):
     """
