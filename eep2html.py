@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Convert PEPs to (X)HTML - courtesy of /F
+"""Convert EEPs to (X)HTML - courtesy of /F
 
-Usage: %(PROGRAM)s [options] [<peps> ...]
+Usage: %(PROGRAM)s [options] [<eeps> ...]
 
 Options:
 
@@ -31,7 +31,7 @@ Options:
 -h, --help
     Print this help message and exit.
 
-The optional arguments ``peps`` are either pep numbers or .txt files.
+The optional arguments ``eeps`` are either pep numbers or .txt files.
 """
 
 import sys
@@ -49,10 +49,10 @@ REQUIRES = {'python': '2.2',
 PROGRAM = sys.argv[0]
 RFCURL = 'http://www.faqs.org/rfcs/rfc%d.html'
 EEPURL = 'eep-%04d.html'
-PEPCVSURL = ('eep-%04d.txt')
-EEPDIRRUL = 'http://www.erlang.org/eeps/'
+EEPCVSURL = ('http://www2.erlang.org/svn/projects/eeps/trunk/eep-%04d.txt')
+EEPDIRRUL = 'http://www2.erlang.org/eeps/'
 
-
+
 HOST = "dinsdale.python.org"                    # host for update
 HDIR = "/data/ftp.python.org/pub/www.python.org/peps" # target host directory
 LOCALVARS = "Local Variables:"
@@ -70,7 +70,7 @@ DTD = ('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"\n'
 
 fixpat = re.compile("((https?|ftp):[-_a-zA-Z0-9/.+~:?#$=&,]+)|(pep-\d+(.txt)?)|"
                     "(RFC[- ]?(?P<rfcnum>\d+))|"
-                    "(EEP\s+(?P<pepnum>\d+))|"
+                    "(PEP\s+(?P<pepnum>\d+))|"
                     ".")
 
 EMPTYSTRING = ''
@@ -78,7 +78,7 @@ SPACE = ' '
 COMMASPACE = ', '
 
 
-
+
 def usage(code, msg=''):
     """Print usage message and exit.  Uses stderr if code != 0."""
     if code == 0:
@@ -91,7 +91,7 @@ def usage(code, msg=''):
     sys.exit(code)
 
 
-
+
 def fixanchor(current, match):
     text = match.group(0)
     link = None
@@ -105,11 +105,11 @@ def fixanchor(current, match):
                 ltext.append(c)
                 break
         link = EMPTYSTRING.join(ltext)
-    elif text.startswith('pep-') and text <> current:
+    elif text.startswith('eep-') and text <> current:
         link = os.path.splitext(text)[0] + ".html"
-    elif text.startswith('PEP'):
-        pepnum = int(match.group('pepnum'))
-        link = EEPURL % pepnum
+    elif text.startswith('EEP'):
+        eepnum = int(match.group('eepnum'))
+        link = EEPURL % eepnum
     elif text.startswith('RFC'):
         rfcnum = int(match.group('rfcnum'))
         link = RFCURL % rfcnum
@@ -118,11 +118,13 @@ def fixanchor(current, match):
     return cgi.escape(match.group(0)) # really slow, but it works...
 
 
-
+
 NON_MASKED_EMAILS = [
     'eeps@erlang.org',
-    'erlang-questions@erlang.org',
+    'erlang-announce@erlang.org',
+    'erlang-bugs@erlang.org',
     'erlang-patches@erlang.org',
+    'erlang-questions@erlang.org',
     ]
 
 def fixemail(address, pepno):
@@ -141,12 +143,12 @@ def linkemail(address, pepno):
             '%s&#32;&#97;t&#32;%s</a>'
             % (parts[0], parts[1], pepno, parts[0], parts[1]))
 
-
+
 def fixfile(inpath, input_lines, outfile):
     from email.Utils import parseaddr
     basename = os.path.basename(inpath)
     infile = iter(input_lines)
-    # convert plaintext pep to minimal XHTML markup
+    # convert plaintext eep to minimal XHTML markup
     print >> outfile, DTD
     print >> outfile, '<html>'
     print >> outfile, COMMENT
@@ -185,8 +187,9 @@ def fixfile(inpath, input_lines, outfile):
         '<table class="navigation" cellpadding="0" cellspacing="0"\n'
         '       width="100%%" border="0">\n'
         '<tr><td class="navicon" width="150" height="35">\n'
-        '<a href="http://www.erlang.org" title="Erlang Home Page">\n'
-        '<border="0" width="150" height="35" /></a></td>\n'
+        '<a href="../" title="Erlang Home">\n'
+        '<img src="../pics/PyBanner%03d.gif" alt="[Python]"\n'
+        ' border="0" width="150" height="35" /></a></td>\n'
         '<td class="textlinks" align="left">\n'
         '[<b><a href="http://www.erlang.org">Erlang Home</a></b>]')
     if basename <> 'eep-0000.txt':
@@ -228,12 +231,12 @@ def fixfile(inpath, input_lines, outfile):
             date = v or time.strftime('%d-%b-%Y',
                                       time.localtime(os.stat(inpath)[8]))
             try:
-                url = PEPCVSURL % int(pep)
+                url = EEPCVSURL % int(pep)
                 v = '<a href="%s">%s</a> ' % (url, cgi.escape(date))
             except ValueError, error:
                 v = date
         elif k.lower() in ('content-type',):
-            url = EEPURL % 2
+            url = EEPURL % 9
             pep_type = v or 'text/plain'
             v = '<a href="%s">%s</a> ' % (url, cgi.escape(pep_type))
         else:
@@ -258,11 +261,11 @@ def fixfile(inpath, input_lines, outfile):
         elif not line.strip() and need_pre:
             continue
         else:
-            # PEP 0 has some special treatment
+            # EEP 0 has some special treatment
             if basename == 'eep-0000.txt':
                 parts = line.split()
                 if len(parts) > 1 and re.match(r'\s*\d{1,4}', parts[1]):
-                    # This is a PEP summary line, which we need to hyperlink
+                    # This is a EEP summary line, which we need to hyperlink
                     url = EEPURL % int(parts[1])
                     if need_pre:
                         print >> outfile, '<pre>'
@@ -292,7 +295,7 @@ def fixfile(inpath, input_lines, outfile):
     print >> outfile, '</body>'
     print >> outfile, '</html>'
 
-
+
 docutils_settings = None
 """Runtime settings object used by Docutils.  Can be set by the client
 application when this module is imported."""
@@ -311,7 +314,7 @@ def fix_rst_pep(inpath, input_lines, outfile):
         settings_overrides={'traceback': 1})
     outfile.write(output)
 
-
+
 def get_pep_type(input_lines):
     """
     Return the Content-Type of the input.  "text/plain" is the default.
@@ -327,11 +330,11 @@ def get_pep_type(input_lines):
             pep_type = line.split()[1] or 'text/plain'
             break
         elif line.startswith('eep: '):
-            # Default PEP type, used if no explicit content-type specified:
+            # Default EEP type, used if no explicit content-type specified:
             pep_type = 'text/plain'
     return pep_type
 
-
+
 def get_input_lines(inpath):
     try:
         infile = open(inpath)
@@ -339,12 +342,12 @@ def get_input_lines(inpath):
         if e.errno <> errno.ENOENT: raise
         print >> sys.stderr, 'Error: Skipping missing EEP file:', e.filename
         sys.stderr.flush()
-        return None, None
+        return None
     lines = infile.read().splitlines(1) # handles x-platform line endings
     infile.close()
     return lines
 
-
+
 def find_pep(pep_str):
     """Find the .txt file indicated by a cmd line argument"""
     if os.path.exists(pep_str):
@@ -354,6 +357,8 @@ def find_pep(pep_str):
 
 def make_html(inpath, verbose=0):
     input_lines = get_input_lines(inpath)
+    if input_lines is None:
+        return None
     pep_type = get_pep_type(input_lines)
     if pep_type is None:
         print >> sys.stderr, 'Error: Input file %s is not a EEP.' % inpath
@@ -396,7 +401,7 @@ def push_pep(htmlfiles, txtfiles, username, verbose, local=0):
     files = htmlfiles[:]
     files.extend(txtfiles)
     files.append("style.css")
-    files.append("pep.css")
+    files.append("eep.css")
     filelist = SPACE.join(files)
     rc = os.system("%s %s %s %s" % (copy_cmd, quiet, filelist, target))
     if rc:
@@ -405,7 +410,7 @@ def push_pep(htmlfiles, txtfiles, username, verbose, local=0):
 ##    if rc:
 ##        sys.exit(rc)
 
-
+
 PEP_TYPE_DISPATCH = {'text/plain': fixfile,
                      'text/x-rst': fix_rst_pep}
 PEP_TYPE_MESSAGES = {}
@@ -434,16 +439,16 @@ def check_requirements():
         if installed < required:
             PEP_TYPE_DISPATCH['text/x-rst'] = None
             PEP_TYPE_MESSAGES['text/x-rst'] = (
-                'Docutils must be reinstalled for "%%(pep_type)s" EEP '
+                'Docutils must be reinstalled for "%%(eep_type)s" EEP '
                 'processing (%%(inpath)s).  Version %s or better required; '
                 '%s present.  See README.txt for installation.'
                 % (REQUIRES['docutils'], docutils.__version__))
 
-def pep_type_error(inpath, eep_type):
-    print >> sys.stderr, 'Error: ' + PEP_TYPE_MESSAGES[eep_type] % locals()
+def pep_type_error(inpath, pep_type):
+    print >> sys.stderr, 'Error: ' + PEP_TYPE_MESSAGES[pep_type] % locals()
     sys.stdout.flush()
 
-
+
 def browse_file(pep):
     import webbrowser
     file = find_pep(pep)
@@ -458,10 +463,10 @@ def browse_remote(pep):
     file = find_pep(pep)
     if file.endswith(".txt"):
         file = file[:-3] + "html"
-    url = EEPDIRRUL + file
+    url = PEPDIRRUL + file
     webbrowser.open(url)
 
-
+
 def main(argv=None):
     # defaults
     update = 0
@@ -498,16 +503,16 @@ def main(argv=None):
             browse = 1
 
     if args:
-        eeptxt = []
+        peptxt = []
         html = []
-        for eep in args:
-            file = find_pep(eep)
-            eeptxt.append(file)
+        for pep in args:
+            file = find_pep(pep)
+            peptxt.append(file)
             newfile = make_html(file, verbose=verbose)
             if newfile:
                 html.append(newfile)
-            if browse and not update:
-                browse_file(eep)
+                if browse and not update:
+                    browse_file(pep)
     else:
         # do them all
         peptxt = []
@@ -523,15 +528,15 @@ def main(argv=None):
             browse_file("0")
 
     if update:
-        push_eep(html, eeptxt, username, verbose, local=local)
+        push_pep(html, peptxt, username, verbose, local=local)
         if browse:
             if args:
-                for eep in args:
-                    browse_remote(eep)
+                for pep in args:
+                    browse_remote(pep)
             else:
                 browse_remote("0")
 
 
-
+
 if __name__ == "__main__":
     main()

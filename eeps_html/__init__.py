@@ -1,6 +1,11 @@
-# $Id: __init__.py 4564 2006-05-21 20:44:42Z felixwiemann $
-# Author: David Goodger <goodger@python.org>
+# Author: David Goodger
+# Contact: goodger@users.sourceforge.net
+# Revision: $Revision: 4163 $
+# Date: $Date: 2005-12-09 05:21:34 +0100 (Fri, 09 Dec 2005) $
 # Copyright: This module has been placed in the public domain.
+# 
+# Converted to EEP writer by raimo@erix.ericsson.se
+# by example from Per Gustafsson
 
 """
 EEP HTML Writer.
@@ -12,7 +17,6 @@ __docformat__ = 'reStructuredText'
 import sys
 import os
 import os.path
-import codecs
 import docutils
 from docutils import frontend, nodes, utils, writers
 from docutils.writers import html4css1
@@ -20,7 +24,7 @@ from docutils.writers import html4css1
 
 class Writer(html4css1.Writer):
 
-    default_stylesheet = 'pep.css'
+    default_stylesheet = 'eep.css'
 
     default_stylesheet_path = utils.relative_path(
         os.path.join(os.getcwd(), 'dummy'),
@@ -34,15 +38,17 @@ class Writer(html4css1.Writer):
 
     settings_spec = html4css1.Writer.settings_spec + (
         'EEP/HTML-Specific Options',
-        'For the EEP/HTML writer, the default value for the --stylesheet-path '
-        'option is "%s", and the default value for --template is "%s". '
-        'See HTML-Specific Options above.'
-        % (default_stylesheet_path, default_template_path),
-        (('Erlang\'s home URL.  Default is "http://www.erlang.org".',
-          ['--python-home'],
+        'The default value for the --stylesheet-path option (defined in '
+        'HTML-Specific Options above) is "%s" for the EEP/HTML writer.'
+        % default_stylesheet_path,
+        (('Specify a template file.  Default is "%s".' % default_template_path,
+          ['--template'],
+          {'default': default_template_path, 'metavar': '<file>'}),
+         ('Erlang\'s home URL.  Default is "http://www.erlang.org".',
+          ['--erlang-home'],
           {'default': 'http://www.erlang.org', 'metavar': '<URL>'}),
-         ('Home URL prefix for PEPs.  Default is "." (current directory).',
-          ['--pep-home'],
+         ('Home URL prefix for EEPs.  Default is "." (current directory).',
+          ['--eep-home'],
           {'default': '.', 'metavar': '<URL>'}),
          # For testing.
          (frontend.SUPPRESS_HELP,
@@ -50,7 +56,7 @@ class Writer(html4css1.Writer):
           {'action': 'store_true', 'validator': frontend.validate_boolean}),))
 
     settings_default_overrides = {'stylesheet_path': default_stylesheet_path,
-                                  'template': default_template_path,}
+                                  'template': default_template_path}
 
     relative_path_settings = (html4css1.Writer.relative_path_settings
                               + ('template',))
@@ -62,39 +68,40 @@ class Writer(html4css1.Writer):
         html4css1.Writer.__init__(self)
         self.translator_class = HTMLTranslator
 
-    def interpolation_dict(self):
-        subs = html4css1.Writer.interpolation_dict(self)
+    def translate(self):
+        html4css1.Writer.translate(self)
         settings = self.document.settings
-        pyhome = settings.python_home
-        subs['pyhome'] = pyhome
-        subs['pephome'] = settings.pep_home
-        if pyhome == '..':
-            subs['pepindex'] = '.'
+        template = open(settings.template).read()
+        # Substitutions dict for template:
+        subs = {}
+        subs['encoding'] = settings.output_encoding
+        subs['version'] = docutils.__version__
+        subs['stylesheet'] = ''.join(self.stylesheet)
+        erlhome = settings.erlang_home
+        subs['erlhome'] = erlhome
+        subs['eephome'] = settings.eep_home
+        if erlhome == '..':
+            subs['eepindex'] = '.'
         else:
-            subs['pepindex'] = '.'
+            subs['eepindex'] = erlhome + '/eeps'
         index = self.document.first_child_matching_class(nodes.field_list)
         header = self.document[index]
-        self.pepnum = header[0][1].astext()
-        subs['pep'] = self.pepnum
+        eepnum = header[0][1].astext()
+        subs['eep'] = eepnum
         if settings.no_random:
             subs['banner'] = 0
         else:
             import random
             subs['banner'] = random.randrange(64)
         try:
-            subs['pepnum'] = '%04i' % int(self.pepnum)
+            subs['eepnum'] = '%04i' % int(eepnum)
         except ValueError:
-            subs['pepnum'] = pepnum
-        self.title = header[1][1].astext()
-        subs['title'] = self.title
+            subs['eepnum'] = eepnum
+        subs['title'] = header[1][1].astext()
         subs['body'] = ''.join(
             self.body_pre_docinfo + self.docinfo + self.body)
-        return subs
-
-    def assemble_parts(self):
-        html4css1.Writer.assemble_parts(self)
-        self.parts['title'] = [self.title]
-        self.parts['pepnum'] = self.pepnum
+        subs['body_suffix'] = ''.join(self.body_suffix)
+        self.output = template % subs
 
 
 class HTMLTranslator(html4css1.HTMLTranslator):
