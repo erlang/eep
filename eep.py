@@ -1,11 +1,8 @@
-# Author: David Goodger
-# Contact: goodger@users.sourceforge.net
-# Revision: $Revision: 3892 $
-# Date: $Date: 2005-09-20 22:04:53 +0200 (Tue, 20 Sep 2005) $
+# eep.py
+# Author: Per Gustafsson
+# This module contains only slight changes from pep.py
+# Original Author: David Goodger <goodger@python.org>
 # Copyright: This module has been placed in the public domain.
-# 
-# Converted to EEP reader by raimo@erix.ericsson.se
-# by example from Per Gustafsson
 
 """
 Erlang Enhancement Proposal (EEP) Reader.

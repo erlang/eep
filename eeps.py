@@ -1,12 +1,8 @@
-# Author: David Goodger
-# Contact: goodger@users.sourceforge.net
-# Revision: $Revision: 3909 $
-# Date: $Date: 2005-09-26 20:17:31 +0200 (Mon, 26 Sep 2005) $
+# eeps.py
+# Author: Per Gustafsson
+# This module contains only slight changes from peps.py
+# Original Author: David Goodger <goodger@python.org>
 # Copyright: This module has been placed in the public domain.
-# 
-# Converted to EEP transfoorm by raimo@erix.ericsson.se
-# by example from Per Gustafsson
-
 
 """
 Transforms for EEP processing.
@@ -14,7 +10,7 @@ Transforms for EEP processing.
 - `Headers`: Used to transform a EEP's initial RFC-2822 header.  It remains a
   field list, but some entries get processed.
 - `Contents`: Auto-inserts a table of contents.
-- `PEPZero`: Special processing for PEP 0.
+- `PEPZero`: Special processing for EEP 0.
 """
 
 __docformat__ = 'reStructuredText'
@@ -32,12 +28,13 @@ from docutils.transforms import parts, references, misc
 class Headers(Transform):
 
     """
-    Process fields in a PEP's initial RFC-2822 header.
+    Process fields in a EEP's initial RFC-2822 header.
     """
 
     default_priority = 360
 
     pep_url = 'eep-%04d.html'
+    ppep_url = 'pep-%04d'
     rcs_keyword_substitutions = (
           (re.compile(r'\$' r'RCSfile: (.+),v \$$', re.IGNORECASE), r'\1'),
           (re.compile(r'\$[a-zA-Z]+: (.+) \$$'), r'\1'),)
@@ -50,7 +47,7 @@ class Headers(Transform):
         if not isinstance(header, nodes.field_list) or \
               'rfc2822' not in header['classes']:
             raise DataError('Document does not begin with an RFC-2822 '
-                            'header; it is not a PEP.')
+                            'header; it is not a EEP.')
         pep = None
         for field in header:
             if field[0].astext().lower() == 'eep': # should be the first field
@@ -75,7 +72,7 @@ class Headers(Transform):
                         field[1] += nodes.paragraph('', '', prb)
                 break
         if pep is None:
-            raise DataError('Document does not contain an RFC-2822 "PEP" '
+            raise DataError('Document does not contain an RFC-2822 "EEP" '
                             'header.')
         if pep == 0:
             # Special processing for PEP 0.
@@ -215,7 +212,7 @@ class TargetNotes(Transform):
 class PEPZero(Transform):
 
     """
-    Special processing for PEP 0.
+    Special processing for EEP 0.
     """
 
     default_priority =760
@@ -229,11 +226,11 @@ class PEPZero(Transform):
 class PEPZeroSpecial(nodes.SparseNodeVisitor):
 
     """
-    Perform the special processing needed by PEP 0:
+    Perform the special processing needed by EEP 0:
 
     - Mask email addresses.
 
-    - Link PEP numbers in the second column of 4-column tables to the PEPs
+    - Link EEP numbers in the second column of 4-column tables to the EEPs
       themselves.
     """
 
@@ -291,7 +288,7 @@ def mask_email(ref, pepno=None):
 
     For email addresses such as "user@host", mask the address as "user at
     host" (text) to thwart simple email address harvesters (except for those
-    listed in `non_masked_addresses`).  If a PEP number (`pepno`) is given,
+    listed in `non_masked_addresses`).  If an EEP number (`pepno`) is given,
     return a reference including a default email subject.
     """
     if ref.hasattr('refuri') and ref['refuri'].startswith('mailto:'):

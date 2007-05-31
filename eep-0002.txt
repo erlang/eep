@@ -4,7 +4,7 @@ Version: $Revision: 14 $
 Last-Modified: $Date: 2007-02-01 15:16:16 +0100 (Thu, 01 Feb 2007) $
 Author: Per Gustafsson <pergu@it.uu.se>
 Status: Active
-Type: Informational
+Type: Process
 Content-Type: text/plain
 Created: 14-Aug-2001
 Post-History:

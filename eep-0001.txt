@@ -35,36 +35,27 @@ feature proposal [3]_.
 EEP Types
 =========
 
-There are three kinds of EEP:
+There are two kinds of EEPs:
 
 1. A **Standards Track** EEP describes a new feature or implementation
    for Erlang.
 
-2. An **Informational** EEP describes a Erlang design issue, or
-   provides general guidelines or information to the Erlang community,
-   but does not propose a new feature.  Informational EEPs do not
-   necessarily represent a Erlang community consensus or
-   recommendation, so users and implementors are free to ignore
-   Informational EEPs or follow their advice.
-
-3. A **Process** EEP describes a process surrounding Erlang, or
-   proposes a change to (or an event in) a process.  Process EEPs are
+2. A **Process** EEP describes a process surrounding Erlang, or
+   proposes a change to (or an event in) a process.  Process EEPs are 
    like Standards Track EEPs but apply to areas other than the Erlang
    language itself.  They may propose an implementation, but not to
-   Erlang's codebase; they often require community consensus; unlike
-   Informational EEPs, they are more than recommendations, and users
-   are typically not free to ignore them.  Examples include release
-   schedules, procedures, guidelines, changes to the decision-making
-   process, and changes to the tools or environment used in Erlang
-   development.
+   Erlang's codebase; they often require community consensus; they are
+   more than recommendations, and users are typically not free to ignore
+   them.  Examples include release schedules, procedures, guidelines,
+   changes to the decision-making process, and changes to the tools or
+   environment used in Erlang development.
 
 
 EEP Work Flow
 =============
 
-The EEP editors assign EEP numbers and change their status.  The
-current EEP editors are XX and YY.  Please send
-all EEP-related email to <eeps@erlang.org>.
+The EEP editors assign EEP numbers and change their status.  Please
+send all EEP-related email to <eeps@erlang.org>.
 
 The EEP process begins with a new idea for Erlang.  It is highly
 recommended that a single EEP contain a single key proposal or new
@@ -88,7 +79,7 @@ proposed title and a rough, but fleshed out, draft of the EEP.  This
 draft must be written in EEP style as described below.
 
 If the EEP editor approves, he will assign the EEP a number, label it
-as Standards Track, Informational, or Process, give it status "Draft",
+as Standards Track or Process, give it status "Draft",
 and create and check-in the initial draft of the EEP.  The EEP editor
 will not unreasonably deny a EEP.  Reasons for denying EEP status
 include duplication of effort, being technically unsound, not
@@ -124,13 +115,15 @@ early design phases, setting up a wiki page, etc.  EEP authors should
 use their discretion here.
 
 Once the authors have completed a EEP, they must inform the EEP editor
-that it is ready for review.  EEPs are reviewed by the Erlang/OTP team
-and their chosen consultants, who may accept or reject a EEP or send
-it back to the author(s) for revision.  For a EEP that is
-pre-determined to be acceptable (e.g., it is an obvious win as-is
-and/or its implementation has already been checked in) the Erlang/OTP
-team may also initiate a EEP review, first notifying the EEP author(s)
-and giving them a chance to make revisions.
+that it is ready for review.  EEPs are reviewed by a commitee of
+people from the Erlang/OTP and the Erlang community who may accept or
+reject a EEP or send it back to the author(s) for revision.  For a EEP
+that is pre-determined to be acceptable (e.g., it is an obvious win
+as-is and/or its implementation has already been checked in) the
+Erlang/OTP team may also initiate a EEP review, first notifying the
+EEP author(s) and giving them a chance to make revisions.
+
+The members of the commitee are: XX, YY, ZZ...
 
 For a EEP to be accepted it must meet certain minimum criteria.  It
 must be a clear and complete description of the proposed enhancement.
@@ -153,14 +146,13 @@ was not a good idea.  It is still important to have a record of this
 fact.
 
 EEPs can also be replaced by a different EEP, rendering the original
-obsolete.  This is intended for Informational EEPs, where version 2 of
-an API can replace version 1.
+obsolete. 
 
 EEP work flow is as follows:
 
 .. image:: eep-0001-1.png
 
-Some Informational and Process EEPs may also have a status of "Active"
+Some Process EEPs may also have a status of "Active"
 if they are never meant to be completed.  E.g. EEP 1 (this EEP).
 
 
@@ -256,7 +248,7 @@ optional and are described below.  All other headers are required. ::
   * Discussions-To: <email address>
     Status: <Draft | Active | Accepted | Deferred | Rejected |
              Final | Replaced>
-    Type: <Standards Track | Informational | Process>
+    Type: <Standards Track | Process>
   * Content-Type: <text/plain | text/x-rst>
   * Requires: <eep numbers>
     Created: <date created on, in dd-mmm-yyyy format>
@@ -289,8 +281,7 @@ necessary if the EEP is being discussed privately with the author, or
 on the erlang mailing list.  Note that email
 addresses in the Discussions-To header will not be obscured.
 
-The Type header specifies the type of EEP: Standards Track,
-Informational, or Process.
+The Type header specifies the type of EEP: Standards Track or Process.
 
 The format of a EEP is specified with a Content-Type header.  The
 acceptable values are "text/plain" for plaintext EEPs (see EEP 2 [3]_)
@@ -305,7 +296,7 @@ headers should be in dd-mmm-yyyy format, e.g. 14-Aug-2006.
 
 Standards Track EEPs must have a Erlang-Version header which indicates
 the version of Erlang that the feature will be released with.
-Informational and Process EEPs do not need a Erlang-Version header.
+Process EEPs do not need a Erlang-Version header.
 
 EEPs may have a Requires header, indicating the EEP numbers that this
 EEP depends on.
@@ -381,9 +372,7 @@ References and Footnotes
 .. [5] EEP 3, Sample reStructuredText EEP Template, Gustafsson
    (http://www.erlang.org/eeps/eep-0003)
 
-.. [6] The script referred to here eep2html.py, which is a hack we
-   need someone to make good tool support for EEPs and we also need an
-   address for EEPs on the web.
+.. [6] The script referred to here is eep2html.py.
 
 .. _Open Publication License: http://www.opencontent.org/openpub/
 
