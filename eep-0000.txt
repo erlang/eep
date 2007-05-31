@@ -1,0 +1,66 @@
+EEP: 0
+Title: Index of Erlang Enhancement Proposals (EEPs)
+Version: $Revision$
+Last-Modified: $Date$
+Author: Raimo Niskanen
+Status: Active
+Type: Process
+Created: 31-May-2007
+Post-History:
+
+
+Introduction
+
+    The EEP contains the index of all Erlang Enhancement Proposals,
+    known as EEPs.  EEP numbers are assigned by the EEP Editor, and
+    once assigned are never changed.  The SVN history[1] of the EEP
+    texts represent their historical record.
+
+
+Numerical Index
+
+     num  title                                        owner
+     ---  -----                                        -----
+
+ P     0  Index of Erlang Enhancement Proposals        Raimo Niskanen
+ P     1  EEP Purpose and Guidelines                   Per Gustafsson
+ P     2  Sample Plaintext PEP Template                Per Gustafsson
+ P     3  Sample reStructuredText EEP Template         Per Gustafsson
+
+
+
+Key
+
+    S - Standards Track PEP
+    P - Process PEP
+
+    A - Accepted proposal
+    R - Rejected proposal
+    W - Withdrawn proposal
+    D - Deferred proposal
+    F - Final proposal
+
+
+
+Owners
+
+    name                     email address
+    ----------------         -------------
+    Raimo Niskanen           
+    Per Gustafsson          
+
+
+
+References
+
+    [1] View EEP history online
+        http://www.erlang.org/svn/projects/eeps/trunk/
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End: 
