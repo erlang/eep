@@ -24,15 +24,15 @@ Numerical Index
 
  P     0  Index of Erlang Enhancement Proposals        Raimo Niskanen
  P     1  EEP Purpose and Guidelines                   Per Gustafsson
- P     2  Sample Plaintext PEP Template                Per Gustafsson
+ P     2  Sample Plaintext EEP Template                Per Gustafsson
  P     3  Sample reStructuredText EEP Template         Per Gustafsson
 
 
 
 Key
 
-    S - Standards Track PEP
-    P - Process PEP
+    S - Standards Track EEP
+    P - Process EEP
 
     A - Accepted proposal
     R - Rejected proposal
