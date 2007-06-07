@@ -188,8 +188,8 @@ def fixfile(inpath, input_lines, outfile):
         '       width="100%%" border="0">\n'
         '<tr><td class="navicon" width="150" height="35">\n'
         '<a href="../" title="Erlang Home">\n'
-        '<img src="../pics/PyBanner%03d.gif" alt="[Python]"\n'
-        ' border="0" width="150" height="35" /></a></td>\n'
+        '<img src="../images/erlang.gif" alt="[Erlang Home]"\n'
+        ' border="0" /></a></td>\n'
         '<td class="textlinks" align="left">\n'
         '[<b><a href="http://www.erlang.org">Erlang Home</a></b>]')
     if basename <> 'eep-0000.txt':
