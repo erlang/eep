@@ -1,7 +1,7 @@
 EEP: 0
 Title: Index of Erlang Enhancement Proposals (EEPs)
-Version: $Revision$
-Last-Modified: $Date$
+Version: $Revision:$
+Last-Modified: $Date:$
 Author: Raimo Niskanen
 Status: Active
 Type: Process
