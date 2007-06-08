@@ -188,7 +188,7 @@ def fixfile(inpath, input_lines, outfile):
         '       width="100%%" border="0">\n'
         '<tr><td class="navicon" width="150" height="35">\n'
         '<a href="../" title="Erlang Home">\n'
-        '<img src="../images/erlang.gif" alt="[Erlang Home]"\n'
+        '<img src="../images/erlang090.gif" alt="[Erlang Home]"\n'
         ' border="0" /></a></td>\n'
         '<td class="textlinks" align="left">\n'
         '[<b><a href="http://www.erlang.org">Erlang Home</a></b>]')
