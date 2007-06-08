@@ -1,7 +1,7 @@
 EEP: 1
 Title: EEP Purpose and Guidelines
-Version: $Revision: 11 $
-Last-Modified: $Date: 2007-01-31 17:14:17 +0100 (Wed, 31 Jan 2007) $
+Version: $Revision$
+Last-Modified: $Date$
 Author: Per Gustafsson <pergu@it.uu.se>
 Status: Draft
 Type: Process
