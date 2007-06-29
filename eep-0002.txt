@@ -189,7 +189,7 @@ Plaintext EEP Formatting Requirements
     If you decide to provide an explicit URL for an EEP, please use
     this as the URL template:
 
-        http://www.erlang.org/eeps/eep-xxxx
+        http://www.erlang.org/eeps/eep-xxxx.html
 
     EEP numbers in URLs must be padded with zeros from the left, so as
     to be exactly 4 characters wide, however EEP numbers in the text
@@ -199,13 +199,13 @@ Plaintext EEP Formatting Requirements
 References
     
     [1] EEP 1, EEP Purpose and Guidelines, Gustafsson
-        http://www.erlang.org/eeps/eep-0001
+        http://www.erlang.org/eeps/eep-0001.html
 
     [2] EEP 3, Sample reStructuredText EEP Template, Gustafsson
-        http://www.erlang.org/eeps/eep-0003
+        http://www.erlang.org/eeps/eep-0003.html
     
     [3] PEP 9, Sample Plaintext PEP Template, Warsaw
-        http://www.python.org/peps/pep-0009
+        http://www.python.org/dev/peps/pep-0009/
     
     [4] http://www.opencontent.org/openpub/
 

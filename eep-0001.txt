@@ -362,15 +362,15 @@ References and Footnotes
    in the public domain.
 
 .. [2] PEP 1, PEP Purpose and Guidelines, Goodger, Hylton, Warsaw
-   (http://www.python.org/dev/peps/pep-0001)
+   (http://www.python.org/dev/peps/pep-0001/)
 
 .. [3] This svn server has not been setup yet but should be setup
 
 .. [4] EEP 2, Sample Plaintext EEP Template, Gustafsson
-   (http://www.erlang.org/eeps/eep-0002)
+   (http://www.erlang.org/eeps/eep-0002.html)
 
 .. [5] EEP 3, Sample reStructuredText EEP Template, Gustafsson
-   (http://www.erlang.org/eeps/eep-0003)
+   (http://www.erlang.org/eeps/eep-0003.html)
 
 .. [6] The script referred to here is eep2html.py.
 

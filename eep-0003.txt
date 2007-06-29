@@ -604,13 +604,13 @@ References
 ==========
 
 .. [1] EEP 1, EEP Purpose and Guidelines, Gustafsson
-   (http://www.erlang.org/eeps/eep-0001)
+   (http://www.erlang.org/eeps/eep-0001.html)
 
 .. [2] EEP 2, Sample Plaintext EEP Template, Gustafsson
-   (http://www.erlang.org/eeps/eep-0002)
+   (http://www.erlang.org/eeps/eep-0002.html)
 
 .. [3] PEP 12, Sample reStructuredText PEP Template, Godger, Warsaw
-   (http://www.python.org/peps/pep-0012)
+   (http://www.python.org/dev/peps/pep-0012/)
 
 Copyright
 =========

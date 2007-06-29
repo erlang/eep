@@ -48,6 +48,7 @@ REQUIRES = {'python': '2.2',
             'docutils': '0.2.7'}
 PROGRAM = sys.argv[0]
 RFCURL = 'http://www.faqs.org/rfcs/rfc%d.html'
+PEPURL = 'http://www.python.org/dev/peps/pep-%04d/'
 EEPURL = 'eep-%04d.html'
 EEPCVSURL = ('http://www2.erlang.org/svn/projects/eeps/trunk/eep-%04d.txt')
 EEPDIRRUL = 'http://www2.erlang.org/eeps/'
@@ -68,9 +69,10 @@ to templates.  DO NOT USE THIS HTML FILE AS YOUR TEMPLATE!
 DTD = ('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"\n'
        '                      "http://www.w3.org/TR/REC-html40/loose.dtd">')
 
-fixpat = re.compile("((https?|ftp):[-_a-zA-Z0-9/.+~:?#$=&,]+)|(pep-\d+(.txt)?)|"
+fixpat = re.compile("((https?|ftp):[-_a-zA-Z0-9/.+~:?#$=&,]+)|(eep-\d+(.txt)?)|"
                     "(RFC[- ]?(?P<rfcnum>\d+))|"
                     "(PEP\s+(?P<pepnum>\d+))|"
+                    "(EEP\s+(?P<eepnum>\d+))|"
                     ".")
 
 EMPTYSTRING = ''
@@ -110,6 +112,9 @@ def fixanchor(current, match):
     elif text.startswith('EEP'):
         eepnum = int(match.group('eepnum'))
         link = EEPURL % eepnum
+    elif text.startswith('PEP'):
+        pepnum = int(match.group('pepnum'))
+        link = PEPURL % pepnum
     elif text.startswith('RFC'):
         rfcnum = int(match.group('rfcnum'))
         link = RFCURL % rfcnum
@@ -236,7 +241,7 @@ def fixfile(inpath, input_lines, outfile):
             except ValueError, error:
                 v = date
         elif k.lower() in ('content-type',):
-            url = EEPURL % 9
+            url = EEPURL % 2
             pep_type = v or 'text/plain'
             v = '<a href="%s">%s</a> ' % (url, cgi.escape(pep_type))
         else:
