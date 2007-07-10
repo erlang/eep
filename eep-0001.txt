@@ -115,7 +115,7 @@ early design phases, setting up a wiki page, etc.  EEP authors should
 use their discretion here.
 
 Once the authors have completed a EEP, they must inform the EEP editor
-that it is ready for review.  EEPs are reviewed by a commitee of
+that it is ready for review.  EEPs are reviewed by a committee of
 people from the Erlang/OTP and the Erlang community who may accept or
 reject a EEP or send it back to the author(s) for revision.  For a EEP
 that is pre-determined to be acceptable (e.g., it is an obvious win
@@ -123,7 +123,7 @@ as-is and/or its implementation has already been checked in) the
 Erlang/OTP team may also initiate a EEP review, first notifying the
 EEP author(s) and giving them a chance to make revisions.
 
-The members of the commitee are: XX, YY, ZZ...
+The members of the committee are listed in the EEP index.
 
 For a EEP to be accepted it must meet certain minimum criteria.  It
 must be a clear and complete description of the proposed enhancement.

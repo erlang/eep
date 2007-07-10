@@ -16,7 +16,6 @@ Introduction
     once assigned are never changed.  The SVN history[1] of the EEP
     texts represent their historical record.
 
-
 Numerical Index
 
      num  title                                        owner
@@ -26,8 +25,6 @@ Numerical Index
  P     1  EEP Purpose and Guidelines                   Per Gustafsson
  P     2  Sample Plaintext EEP Template                Per Gustafsson
  P     3  Sample reStructuredText EEP Template         Per Gustafsson
-
-
 
 Key
 
@@ -40,8 +37,6 @@ Key
     D - Deferred proposal
     F - Final proposal
 
-
-
 Owners
 
     name                     email address
@@ -49,7 +44,16 @@ Owners
     Raimo Niskanen           
     Per Gustafsson          
 
+EEP editor(s) committee
 
+    name                     position
+    ----------------         --------
+    Mats Cronqvist           Ericsson
+    Ulf Wiger                Ericsson
+    Kostis Sagonas           Professor @ Uppsala University
+    Joe Armstrong            Ericsson
+    Robert Virding           Nestor
+    Richard Carlsson         Uppsala University
 
 References
 
