@@ -48,6 +48,7 @@ EEP editor(s) committee
 
     name                     position
     ----------------         --------
+    Kenneth Lundin           Ericsson
     Mats Cronqvist           Ericsson
     Ulf Wiger                Ericsson
     Kostis Sagonas           Professor @ Uppsala University
