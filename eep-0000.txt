@@ -39,22 +39,22 @@ Key
 
 Owners
 
-    name                     email address
-    ----------------         -------------
+    name                 email address
+    ----------------     -------------
     Raimo Niskanen           
     Per Gustafsson          
 
 EEP editor(s) committee
 
-    name                     position
-    ----------------         --------
-    Kenneth Lundin           Ericsson
-    Mats Cronqvist           Ericsson
-    Ulf Wiger                Ericsson
-    Kostis Sagonas           Professor @ Uppsala University
-    Joe Armstrong            Ericsson
-    Robert Virding           Nestor
-    Richard Carlsson         Uppsala University
+    name                 position
+    ----------------     --------
+    Kenneth Lundin       Ericsson, Head of Erlang/OTP development team
+    Mats Cronqvist       Ericsson
+    Ulf Wiger            Ericsson
+    Kostis Sagonas       Uppsala University, director of the HiPE group
+    Joe Armstrong        Ericsson, one of the original inventors of Erlang
+    Robert Virding       One of the original inventors of Erlang
+    Richard Carlsson     IAR Systems, former member of the HiPE group
 
 References
 
