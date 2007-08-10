@@ -26,6 +26,10 @@ Numerical Index
  P     2  Sample Plaintext EEP Template                Per Gustafsson
  P     3  Sample reStructuredText EEP Template         Per Gustafsson
 
+ S     4  New BIFs for bit-level binaries (bitstrs)    Per Gustafsson
+ S     5  More Versatile Encapsulation with export_to  Per Gustafsson
+ S     6  New BIFs for tuple arity and binary size     Bjorn Gustavsson
+
 Key
 
     S - Standards Track EEP
@@ -41,8 +45,9 @@ Owners
 
     name                 email address
     ----------------     -------------
-    Raimo Niskanen           
-    Per Gustafsson          
+    Raimo Niskanen       
+    Per Gustafsson       
+    Bjorn Gustavsson     
 
 EEP editor(s) committee
 

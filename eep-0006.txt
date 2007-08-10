@@ -1,0 +1,53 @@
+EEP: 6
+Title: New BIFs for tuple arity and binary size
+Version: $Revision$
+Last-Modified: $Date$
+Author: Bjorn Gustavsson
+Status: Draft
+Type: Standards Track
+Content-Type: text/x-rst
+Created: 10-Aug-2007
+Erlang-Version: R12B-0
+Post-History: 
+
+Abstract
+========
+
+This EEP describes the two new guards BIFs ``arity/1`` and ``bytesize/1``
+as a prefered alternative to the ``size/1`` BIF.
+
+Specifications
+==============
+
+``bytesize/1::binary() -> integer()``
+
+Returns the size of a binary in bytes. This BIF will fail if
+passed a *bitstr* (see http://www.erlang.org/eeps/eep-0004.html)
+or any other type of term. This BIF is allowed in guards.
+
+``arity/1::tuple() -> integer()``
+
+Returns the arity for a tuple. This BIF will fail if passed anything
+that is not a tuple. This BIF is allowed in guards.
+
+Rationale
+=========
+
+The ``size/1`` BIF accepts either a binary or a tuple, and returns
+either the size of binary in bytes or the arity of the tuple.
+
+Because ``size/1`` accepts two different types, it is difficult to
+optimize uses of it, both in the compiler and in the run-time system.
+Adding the two new BIF will faciliate optimization, and will also
+help Dialyzer.
+
+Implementation
+==============
+
+The implementation is trivial.
+
+Backwards Compatibility
+=======================
+
+Code containing local functions named ``arity/1`` or ``bytesize/1`` need
+to be changed.
