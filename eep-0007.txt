@@ -1,0 +1,412 @@
+EEP: 7
+Title: Foreign Function Interface (FFI)
+Version: $Revision$
+Last-Modified: $Date$
+Author: Alceste Scalas <alceste (at) crs4 (dot) it>
+Status: Draft
+Type: Standards Track
+Content-Type: text/x-rst
+Created: 3-Sep-2007
+Erlang-Version: R12B
+Post-History:
+
+
+Abstract
+========
+
+This EEP describes a Foreign Function Interface (FFI) for Erlang/OTP,
+that allows to easily perform direct calls of external C functions.
+It introduces three new BIFs (`ffi:call/3`_,
+`erl_ddll:load_library/3`_ and `ffi:call/2`_) that accomplish the main
+FFI tasks: loading generic C libraries, making external function calls
+and performing automatic Erlang-to-C and C-to-Erlang type conversions.
+
+
+Rationale
+=========
+
+The current Erlang extension mechanisms can be divided in two main
+categories:
+
+1. absolute stability at the price of speed (C nodes, pipe drivers);
+
+2. more speed at the (potential) price of stability (linked-in
+   drivers).
+
+Linked-in drivers have thus become the standard way for creating
+library bindings when efficiency is an issue.  In both cases, however,
+the Erlang driver interface implies the development of relevant
+amounts of glue code, mostly because the communication between Erlang
+and C always requires data parsing and (de)serialization.  Several
+tools have been created in order to autogenerate (at least part of)
+that glue: from the (now unmaintained) IG driver generation tool [1]_
+to the newer Erlang Driver Toolkit (EDTK) [2]_ and Dryverl [3]_.
+
+This EEP proposes a new Erlang extension method of the 2nd category,
+that would allow to easily perform direct C function calls with
+automatic Erlang/C type conversion.  This method would have three
+significant advantages:
+
+- interfaces to existing C libraries could be developed more quickly,
+  with a lower learning curve and less bugs (expecially because of
+  automatic Erlang/C type handling);
+
+- libraries written in other languages could be         easily interfaced as
+  well, as long as there is a way to call them from C;
+
+- Erlang/OTP programmers would be allowed to rewrite
+  performance-critical portions of their applications in C (or
+  Fortran, or other languages callable from C) without having to
+  develop a full-fledged Erlang driver.
+
+These facilitations could drastically extend the Erlang capabilities
+and open new usage scenarios.
+
+The BIFs proposed in this EEP don't give any access to the Erlang VM
+internals --- but the called C functions could leak memory and/or
+cause the Erlang VM to crash.  These BIFs are, thus, not intended for
+"casual" Erlang developers: they are a tool designed for library
+bindings developers (that should take care of hiding their usage from
+final users), and advanced programmers looking for an easy (and
+efficient) way to call C code from Erlang.
+
+
+Overview
+========
+
+The core function of the FFI interface is the `ffi:call/3`_ BIF, that
+performs a direct C function call through an open port.
+
+When taken alone, ffi:call/3 has got two main drawbacks: it introduces
+great call overhead (due to the C symbol lookup and the dynamic
+construction of the function call), and requires an open port
+associated to an Erlang driver.  This means that, in order to call a C
+function, a developer would be required to:
+
+1. create a C file with a void ErlDrvEntry structure and driver init
+   function;
+
+2. compile it and possibly link it against the required C libraries,
+   thus obtaining a void Erlang driver;
+
+3. load the driver in the Erlang VM, by using erl_ddll:load/2.
+
+In order to simplify this procedure, a new `erl_ddll:load_library/3`_
+BIF is proposed: it loads an arbitrary C shared library, without
+requiring an ErlDrvEntry.  erlang:open_port/2 could then be used to
+obtain a port for the FFI BIFs.
+
+As an optimization, erl_ddll:load_library/3 is also able to preload C
+function symbols and precompile the dynamic function calls, thus
+allowing to speed up foreign code invocations.  These optimizations
+are exploited by `ffi:call/2`_, a BIF that guarantees a lower call
+overhead than ffi:call/3.
+
+
+Specifications
+==============
+
+ffi:call/3
+----------
+
+``ffi:call(Port, CallArgs, CallTypes) -> term()``
+
+Types:
+
+- Port = port()
+
+- CallArgs = {FuncName, Arg1, ...}
+
+- FuncName = atom() | string()
+
+- Arg1, ... = term()
+
+- CallTypes = {FuncRetType, Arg1Type, ...}
+
+- FuncRetType = atom()
+
+- Arg1Type, ... = atom()
+
+Call the specified C function.
+
+This BIF accepts the following parameters:
+
+    **Port**
+        A port opened towards the required driver/library.
+
+    **CallArgs**
+        A tuple with the function name (atom or string) followed by
+        its arguments (if any).
+
+    **CallTypes**
+        A tuple of atoms representing the function return type,
+        followed by the function arguments types (if any).
+
+This BIF returns the return value of the C function being called (or
+'ok' if the return type is void).  It automatically converts Erlang
+terms to/from C values.  The supported C types and conversions are
+reported in the Appendix_.
+
+The following example calls the malloc() and free() functions from the
+standard C library (it should work with any Erlang linked-in driver): ::
+
+    Pointer = ffi:call(Port, {malloc, 1024}, {pointer, size_t}),
+    ok = ffi:call(Port, {free, Pointer}, {void, pointer}).
+
+**WARNING:** bugs and/or misuses of the external C functions can
+affect the Erlang VM, possibly making it crash.  Use this BIF with
+extreme care.
+
+
+erl_ddll:load_library/3
+-----------------------
+
+``erl_ddll:load_library(Path, Name, OptionsList) -> ok | {error, ErrorDesc}``
+
+Types:
+
+- Path = Name = string() | atom()
+
+- OptionList = [Option]
+
+- Option = {preload, [Preload]}
+
+- Preload = {FuncName, CallTypes}
+
+Load a generic shared library.
+
+If an ErlDrvEntry structure and a driver init function are found when
+loading the library, this BIF will behave like erl_ddll:load/2.  The
+function parameters are also the same of erl_ddll:load/2, with the
+following addition:
+
+    **OptionList**
+        A list of options for library/driver loading.  The supported
+        options are:
+
+            **{preload, PreloadList}**
+                Preload the given list of functions, and prepare their
+                optimized calls (see `ffi:call/2`_).  Each PreloadList
+                element is a tuple in the form:
+
+                    {FuncName, {RetType, TypeArg1, ...}}
+
+                i.e. the function name (atom or string) followed by
+                its return and arguments types (see FuncName and
+                CallTypes in the `ffi:call/3`_ spec).
+
+The function return values are the same of erl_ddll:load/2.
+
+Once a library has been loaded, it is possible to use
+erlang:open_port/2 to get a port.  That port could *always* be used
+with `ffi:call/3`_ or `ffi:call/2`_.  However, if the loaded library
+does not contain a proper ErlDrvEntry structure and a driver init
+function, the port will **not** be useable with erlang:port_command/2,
+erlang:port_control/3 etc.
+
+The following example loads the C standard library and preloads some
+functions: ::
+
+    ok = erl_ddll:load_library("/lib", libc,
+                               [{preload,
+                                 [{puts, {sint, pointer}},
+                                  {putchar, {sint, sint}},
+                                  {malloc, {pointer, size_t}},
+                                  {free, {void, pointer}}]}]).
+
+
+ffi:call/2
+----------
+
+``ffi:call(Port, OptimizedCall) -> term()``
+
+Types:
+
+- Port = port()
+
+- OptimizedCall = {FuncIndex, Arg1, ...}
+
+- FuncIndex = integer()
+
+- Arg1, ... = term()
+
+Call a function preloaded with the 'preload' option of
+`erl_ddll:load_library/3`_.
+
+This BIF accepts the following parameters:
+
+    **Port**
+        A port opened towards the required driver/library (that
+        **must** have been loaded with `erl_ddll:load_library/3`_).
+
+    **OptimizedCall**
+        A tuple with the function index (i.e. its position in
+        the preload list) followed by its arguments (if any).
+
+This BIF returns the return value of the C function being called (or
+'ok' if the return type is void).  It automatically converts Erlang
+terms to/from C values.  The supported C types and conversions are
+reported in the Appendix_.
+
+The following example calls malloc() and free(), after they have been
+preloaded with the code sample shown in `erl_ddll:load_library/3`_: ::
+
+    Port = open_port({spawn, "libc"}, [binary]),
+    Pointer = ffi:call(Port, {3, 1024}),
+    ffi:call(Port, {4, Pointer})
+
+**WARNING:** bugs and/or misuses of the external C functions can
+affect the Erlang VM, possibly making it crash.  Use this BIF with
+extreme care.
+
+
+Further notes on FFI preloading
+===============================
+
+When a library is loaded with `erl_ddll:load_library/3`_, it may be
+reloaded or unloaded just like any Erlang linked-in driver.  If the
+'preload' option is used, then two additional behaviours arise:
+
+- if `erl_ddll:load_library/3`_ is called two or more times with the
+  same library, then the associated preload list must be rebuilt
+  according to the last call.  If no 'preload' option is used, then
+  the last preloads (if any) must be kept intact;
+
+- if an erl_ddll:reload/2 is issued, then the last preloads must be
+  refreshed by performing a new symbol lookup in the loaded library.
+  If one or more symbols could not be found anymore, then they must be
+  disabled (and an error must be raised when trying to use them with
+  `ffi:call/2`_).
+
+
+Implementation
+==============
+
+An implementation of this EEP is available on [4]_ as a set of patches
+agains OTP R11B-5.
+
+The code is based on the GCC's FFI library (libffi) [5]_.  libffi can
+be packaged and used separately from the GCC source code, and it is
+released under a very permissive license [6]_ (compatible with the
+Erlang Public License).  It has been used to implement the FFI
+interface of several applications and languages, including Python
+[7]_.
+
+
+References
+==========
+
+.. [1] IG: the Erlang Interface Generator, Törnquist and Lundell 
+       http://www1.erlang.org/documentation/doc-4.8.2/lib/ig-1.8/doc/index.html
+
+.. [2] The Evolution of Erlang Drivers and the Erlang Driver Toolkit, Fritchie
+       http://www.erlang.se/workshop/2002/Fritchie.pdf
+
+.. [3] The Dryverl Erlang/C binding compiler
+       http://dryverl.objectweb.org/
+
+.. [4] Foreign Function Interface (FFI) for Erlang/OTP
+       http://muvara.org/crs4/erlang/ffi
+
+.. [5] libffi: the GCC Foreign Function Interface Library
+       http://gcc.gnu.org/viewcvs/trunk/libffi/
+
+.. [6] The libffi license
+       `http://gcc.gnu.org/viewcvs/*checkout*/trunk/libffi/LICENSE <http://gcc.gnu.org/viewcvs/*checkout*/trunk/libffi/LICENSE>`_
+
+.. [7] The CPython package
+       http://python.net/crew/theller/ctypes/
+
+
+Appendix
+========
+
+Erlang-to-C automatic type conversions
+--------------------------------------
+
+The following table reports the Erlang-to-C conversions, used for
+passing Erlang terms as C function call arguments.
+
+====================== ===============================
+ C argument type        Supported Erlang types
+====================== ===============================
+uchar                  integer (small)
+schar                  integer (small)
+ushort                 integer (small)
+sshort                 integer (small)
+uint                   integer (small or big)
+sint                   integer (small or big)
+ulong                  integer (small or big)
+slong                  integer (small or big)
+uint8                  integer (small)
+sint8                  integer (small)
+uint16                 integer (small)
+sint16                 integer (small)
+uint32                 integer (small or big)
+sint32                 integer (small or big)
+uint64                 integer (small or big)
+sint64                 integer (small or big)
+float                  float
+double                 float
+longdouble             float
+pointer                binary, integer (small or big)
+size_t                 integer (small or big)
+ssize_t                integer (small or big)
+====================== ===============================
+
+
+C-to-Erlang automatic type conversions
+--------------------------------------
+
+The following table reports the C-to-Erlang conversions, used for
+converting C function return values into Erlang terms.
+
+====================== ===============================
+ C return type          Resulting Erlang type
+====================== ===============================
+uchar                  integer (small)
+schar                  integer (small)
+ushort                 integer (small)
+sshort                 integer (small)
+uint                   integer (small or big)
+sint                   integer (small or big)
+ulong                  integer (big)
+slong                  integer (big)
+uint8                  integer (small)
+sint8                  integer (small)
+uint16                 integer (small)
+sint16                 integer (small)
+uint32                 integer (small or big)
+sint32                 integer (small or big)
+uint64                 integer (big)
+sint64                 integer (big)
+float                  float
+double                 float
+longdouble             float
+pointer                integer (big)
+size_t                 integer (small or big)
+ssize_t                integer (small or big)
+====================== ===============================
+
+
+Copyright
+=========
+
+Copyright (C) 2007 by CRS4 (Center for Advanced Studies, Research and
+Development in Sardinia) - http://www.crs4.it/
+
+Author: Alceste Scalas <alceste (at) crs4 (dot) it>
+
+This EEP is released under the terms of the Creative Commons
+Attribution 3.0 License.  See
+http://creativecommons.org/licenses/by/3.0/
+
+
+..
+   Local Variables:
+   mode: indented-text
+   indent-tabs-mode: nil
+   sentence-end-double-space: t
+   fill-column: 70
+   coding: utf-8
+   End:

@@ -171,7 +171,8 @@ Each EEP should have the following parts:
 
 3. Copyright/public domain -- Each EEP must either be explicitly
    labelled as placed in the public domain (see this EEP as an
-   example) or licensed under the `Open Publication License`_.
+   example) or licensed under the `Open Publication License`_,
+   or the `Creative Commons Attribution 3.0 License`_.
 
 4. Specification -- The technical specification should describe the
    syntax and semantics of any new language feature.  The
@@ -375,6 +376,9 @@ References and Footnotes
 .. [6] The script referred to here is eep2html.py.
 
 .. _Open Publication License: http://www.opencontent.org/openpub/
+
+.. _Creative Commons Attribution 3.0 License:
+   http://creativecommons.org/licenses/by/3.0/
 
 .. _reStructuredText: http://docutils.sourceforge.net/rst.html
 
