@@ -1,5 +1,5 @@
 EEP: 6
-Title: New BIFs for tuple arity and binary size
+Title: New BIFs for tuple and binary sizes
 Version: $Revision$
 Last-Modified: $Date$
 Author: Bjorn Gustavsson
@@ -13,33 +13,45 @@ Post-History:
 Abstract
 ========
 
-This EEP describes the two new guards BIFs ``arity/1`` and ``bytesize/1``
+This EEP describes the two new guards BIFs ``tuple_size/1`` and ``byte_size/1``
 as a prefered alternative to the ``size/1`` BIF.
 
 Specifications
 ==============
 
-``bytesize/1::binary() -> integer()``
+``byte_size/1::bitstring() -> integer()``
 
-Returns the size of a binary in bytes. This BIF will fail if
-passed a *bitstr* (see http://www.erlang.org/eeps/eep-0004.html)
-or any other type of term. This BIF is allowed in guards.
+Returns the number of bytes needed to store the entire *bitstring*
+(see http://www.erlang.org/eeps/eep-0004.html). This BIF will return
+the same value as ``(bit_size(Bin)+7) div 8`` (that is, the number
+of bytes will be rounded up if number of bits is not evenly divisible by 8).
+This BIF is allowed in guards.
 
-``arity/1::tuple() -> integer()``
+``tuple_size/1::tuple() -> integer()``
 
-Returns the arity for a tuple. This BIF will fail if passed anything
+Returns the size of a tuple. This BIF will fail if passed anything
 that is not a tuple. This BIF is allowed in guards.
 
 Rationale
 =========
 
 The ``size/1`` BIF accepts either a binary or a tuple, and returns
-either the size of binary in bytes or the arity of the tuple.
+either the size of binary in bytes or the size of the tuple.
 
 Because ``size/1`` accepts two different types, it is difficult to
 optimize uses of it, both in the compiler and in the run-time system.
 Adding the two new BIF will faciliate optimization, and will also
 help Dialyzer.
+
+It could be argued that ``byte_size/1`` should only work for
+binaries (bitstrings whose size in bits is disivible by 8) to catch
+the bug that the code cannot handle general bitstrings and still does not
+use an ``is_binary/1`` guard test. In my opinion, if the programmer
+must round up the result from ``bit_size/1`` to a whole number of bytes,
+he or she is more likely to get *that* wrong: The "obvious" expressions
+``bit_size(B) / 8 + 1`` or ``bit_size(B) div 8 + 1`` are both wrong,
+and the correct expression ``(bit_size(B)+7) div 8`` is not immediately
+obvious.
 
 Implementation
 ==============
@@ -49,5 +61,8 @@ The implementation is trivial.
 Backwards Compatibility
 =======================
 
-Code containing local functions named ``arity/1`` or ``bytesize/1`` need
+Code containing local functions named ``tuple_size/1`` or ``byte_size/1`` need
 to be changed.
+
+The compiler will issue a warning that ``size/1`` is deprecated and will be removed
+in R14B for code that uses ``size/1``.
