@@ -1,5 +1,5 @@
 EEP: 4
-Title: New BIFs for bit-level binaries (bitstrs)
+Title: New BIFs for bit-level binaries (bit strings)
 Version: $Revision$
 Last-Modified: $Date$
 Author: Per Gustafsson
@@ -23,37 +23,39 @@ operations for bit level binaries using new BIFs.
 Definitions
 ===========
 
-A bit-level binary in this document called a *bitstr* is a sequence of
+A bit-level binary in this document called a *bit string* is a sequence of
 bits of any length. A *binary* on the other hand is a sequence of bits
 where the number of bits is evenly divisible by eight. These
-definitions implies that any *binary* is also a *bitstr*.
+definitions implies that any binary is also a bit string.
 
-Manipulating *bitstrs* using the bit syntax
+Manipulating bit strings using the bit syntax
 ===========================================
 
 A bit syntax expression: 
 
 ``<<Seg1,...,SegN>>`` 
 
-Evaluates to a *bitstr*, if the sum of the sizes of all segments in the
+Evaluates to a bit string, if the sum of the sizes of all segments in the
 expression is divisible by eight the result is also a
 binary. Previously such expression could only evaluate to binaries and
 a runtime error was raised if this was not the case.
 
 With this extension the expression ``Bin = <<1:9>>`` which previously caused a
 runtime error now creates a 9-bit binary. To be able to use this
-*bitstr* to build a new bigger *bitstr* we can write: 
+bit string to build a new bigger bit string we can write: 
 
-``<<Bin/bitstr, 0:1>>``
+``<<Bin/bitstring, 0:1>>``
 
-Note the use of bitstr as the type. This expands to binary-unit:1
-where as the binary type would have expanded to binary-unit:8.
+Note the use of bitstring as the type. This expands to binary-unit:1 where as
+the binary type would have expanded to binary-unit:8. Since bitstring is a long
+word to write in a binary pattern there is an alias *bits* which is used in the
+rest of this proposal, similarily for binary there is a shorthand *bytes*.
 
-To match out a bit-level binary we also use the bitstr type as in ::
+To match out a bit-level binary we also use the bit string type as in ::
     
     case Bin of
-      <<1:1,Rest/bitstr>> -> Rest;
-      <<0:1,_/bitstr>> -> 0
+      <<1:1,Rest/bits>> -> Rest;
+      <<0:1,_/bits>> -> 0
     end
 
 This allows us to avoid situations were we would have to calculate
@@ -63,28 +65,28 @@ padding.
 Specifications
 ==============
 
-``bitsize/1::bitstr() -> integer()``
+``bitsize/1::bitstring() -> integer()``
 
-Returns the size of a *bitstr* in bits. This BIF is allowed in guards.
+Returns the size of a bit string in bits. This BIF is allowed in guards.
 
-``list_to_bitstr/1::bitstr_list() -> bitstr()``
+``list_to_bitstring/1::bitstring_list() -> bitstr()``
 
-``bitstr_list = cons(char() | bitstr()| bitstr_list(), bitstr() | bitstr_list) | nil()``
+``bitstring_list = cons(char() | bitstring()| bitstring_list(), bitstring() | bitstring_list) | nil()``
 
-Concatenates the *bitstrs* and chars in the bitstr_list to create a
-*bitstr*, each char becomes an 8-bit *bitstr*.
+Concatenates the bit strings and chars in the bitstring_list to create a bit
+string, each char becomes an 8-bit bit string.
 
-``is_bitstr/1::any() -> bool()``
+``is_bitstring/1::any() -> bool()``
 
-Returns true if the argument is a *bitstr*, otherwise it returns
+Returns true if the argument is a bit string, otherwise it returns
 false. This BIF is allowed in guards.
 
-``bitstr_to_list/1::bitstr() -> [char()|bitstr()]``
+``bitstring_to_list/1::bitstring() -> [char()|bitstring()]``
 
-Turns a *bitstr* into a list of characters and if the number of bits
-in the *bitstr* is not evenly divisible by eight the last element in
-the list is a *bitstr* consisting of the last 1-7 bits of the original
-*bitstr*.
+Turns a bit string into a list of characters and if the number of bits
+in the bit string is not evenly divisible by eight the last element in
+the list is a bit string consisting of the last 1-7 bits of the original
+bit string.
 
 Rationale
 =========
@@ -116,10 +118,10 @@ Backwards Compatibility
 
 This change will not be entirely backward compatible for example:
 ``N=9, <<1:N>>`` would cause an error in the old system and now it would
-evaluate to a *bitstr*. 
+evaluate to a bit string. 
 
 The new BIFs are intended to give the same expressiveness for handling
 bit-level binaries as we have for ordinary binaries without changing
 the semantics of the BIFs for binaries such as size/1,
 binary_to_list/1, list_to_binary/1 etc.. This means that all such BIFs
-will throw an exception if their arguments contains *bitstrs*.
+will throw an exception if their arguments contains bit strings.
