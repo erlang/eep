@@ -29,7 +29,7 @@ where the number of bits is evenly divisible by eight. These
 definitions implies that any binary is also a bit string.
 
 Manipulating bit strings using the bit syntax
-===========================================
+=============================================
 
 A bit syntax expression: 
 
