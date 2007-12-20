@@ -1,7 +1,7 @@
 EEP: 8
 Title: Types and function specifications
-Version: $Revision:$
-Last-Modified: $Date:$
+Version: $Revision$
+Last-Modified: $Date$
 Author: Tobias Lindahl <tobias(dot)lindahl(at)it(dot)uu(dot)se>, Kostis Sagonas <kostis(at)it(dot)uu(dot)se>
 Status: Draft
 Type: Standards Track
@@ -59,7 +59,7 @@ describes the same set of terms as the type union::
 
 Because of subtype relations that exist between types, types form a
 lattice where the topmost element, ``any()``, denotes the set of all Erlang
-terms and the topmost element, ``none()``, denotes the empty set of terms.
+terms and the bottommost element, ``none()``, denotes the empty set of terms.
 
 The set of predefined types and the syntax for types is given below::
 
@@ -147,7 +147,7 @@ table. (Some type unions below slightly abuse the syntax of types.)
     ``no_return()``             ``none()``
     ==========================  =====================================
 
-The user is not allowed to define types with similar names as the
+The user is not allowed to define types with the same names as the
 predefined or built-in ones.  This is checked by the compiler and its
 violation results in a compilation error.
 
@@ -311,7 +311,7 @@ is the only guard which can be used in a ``'spec'`` attribute.
 The scope of an ``is_subtype/2`` constraint is the ``(...) -> RetType``
 specification after which it appears. To avoid confusion, we suggest
 that different variables are used in different constituents of an
-overloaded contact as in the example below::
+overloaded contract as in the example below::
 
     -spec(f/1 :: ({X, integer()}) -> X when is_subtype(X, atom())
                ; ([Y]) -> Y when is_subtype(Y, number())).
