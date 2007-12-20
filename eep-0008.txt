@@ -1,0 +1,352 @@
+EEP: 8
+Title: Types and function specifications
+Version: $Revision:$
+Last-Modified: $Date:$
+Author: Tobias Lindahl <tobias(dot)lindahl(at)it(dot)uu(dot)se>, Kostis Sagonas <kostis(at)it(dot)uu(dot)se>
+Status: Draft
+Type: Standards Track
+Content-Type: text/x-rst
+Created: 2-Dec-2007
+Erlang-Version: R12B
+Post-History: 
+
+Abstract
+========
+
+This EEP describes an extension to the Erlang language for
+declaring sets of Erlang terms to form a particular type, effectively
+forming a specific subtype of the set of all Erlang terms.
+Subsequently, these types can be used to specify types of record
+fields and argument and return values of functions.
+
+Rationale
+=========
+
+Type information can be used to document function interfaces, provide
+more information for bug detection tools such as Dialyzer, and can be
+exploited by documentation tools such as Edoc for generating program
+documentation of various forms. It is expected that the type language
+described in this document will supersede and eventually replace the
+purely comment-based type language currently used by Edoc.
+
+
+
+Specification
+=============
+
+Types and their syntax
+----------------------
+Types describe sets of Erlang terms. Types consist and are built from
+a set of predefined types (e.g. ``integer()``, ``atom()``, ``pid()``, ...)
+described below. Predefined types represent a typically infinite set
+of Erlang terms which belong to this type. For example, the type
+``atom()`` stands for the set of all Erlang atoms.
+
+For integers and atoms, we allow for singleton types (e.g. the
+integers ``-1`` and ``42`` or the atoms ``'foo'`` and ``'bar'``).
+
+All other types are built using unions of either predefined types or
+singleton types. In a type union between a type and one of its
+subtypes the subtype is absorbed by the supertype and the union is
+subsequently treated as if the subtype was not a constituent of the
+union. For example, the type union::
+
+    atom() | 'bar' | integer() | 42
+
+describes the same set of terms as the type union::
+
+   atom() | integer()
+
+Because of subtype relations that exist between types, types form a
+lattice where the topmost element, ``any()``, denotes the set of all Erlang
+terms and the topmost element, ``none()``, denotes the empty set of terms.
+
+The set of predefined types and the syntax for types is given below::
+
+    Type :: any()            %% The top type, the set of all Erlang terms.
+          | none()           %% The bottom type, contains no terms.
+          | pid()
+          | port()
+          | ref()
+          | []               %% nil
+          | Atom
+          | Binary
+          | float()
+          | Fun
+          | Integer
+          | List
+          | Tuple
+          | Union
+          | UserDefined      %% described in Section 2
+
+    Union :: Type1 | Type2
+    
+    Atom :: atom()
+          | Erlang_Atom      %% 'foo', 'bar', ...
+
+    Binary :: binary()                        %% <<_:_ * 8>>
+            | <<>>
+            | <<_:Erlang_Integer>>            %% Base size
+            | <<_:_*Erlang_Integer>>          %% Unit size
+            | <<_:Erlang_Integer, _:_*Erlang_Integer>>
+ 
+    Fun :: fun()                              %% any function
+         | fun((...) -> Type)                 %% any arity, returning Type
+         | fun(() -> Type)
+         | fun((TList) -> Type)
+
+    Integer :: integer()
+             | Erlang_Integer                 %% ..., -1, 0, 1, ... 42 ...
+             | Erlang_Integer..Erlang_Integer %% specifies an integer range
+
+    List :: list(Type)                        %% Proper list ([]-terminated)
+          | improper_list(Type1, Type2)       %% Type1=contents, Type2=termination
+          | maybe_improper_list(Type1, Type2) %% Type1 and Type2 as above
+
+    Tuple :: tuple()                          %% stands for a tuple of any size
+           | {}
+           | {TList}
+
+    TList :: Type
+           | Type, TList
+
+
+Because lists are commonly used, they have shorthand type notations.
+The type ``list(T)`` has the shorthand ``[T]``. The shorthand ``[T,...]`` stands
+for the set of non-empty proper lists whose elements are of type ``T``.
+The only difference between the two shorthands is that ``[T]`` may be an
+empty list but ``[T,...]`` may not.
+
+Notice that the shorthand for ``list()``, i.e. the list of elements of
+unknown type, is ``[_]`` (or ``[any()]``), not ``[]``. The notation ``[]``
+specifies the singleton type for the empty list.
+
+For convenience, the following types are also built-in. They can be
+thought as predefined aliases for the type unions also shown in the
+table. (Some type unions below slightly abuse the syntax of types.)
+
+    ==========================  =====================================
+          Built-in type                   Stands for
+    ==========================  =====================================
+    ``bool()``                  ``'false' | 'true'``
+    ``byte()``                  ``0..255``
+    ``char()``                  ``0..16#10ffff``
+    ``non_neg_integer()``       ``0..``
+    ``pos_integer()``           ``1..``
+    ``neg_integer()``           ``..-1``
+    ``number()``                ``integer() | float()``
+    ``list()``                  ``[any()]``
+    ``maybe_improper_list()``   ``maybe_improper_list(any(), any())``
+    ``maybe_improper_list(T)``  ``maybe_improper_list(T, any())``
+    ``string()``                ``[char()]``
+    ``nonempty_string()``       ``[char(),...]``
+    ``iolist()``                ``maybe_improper_list(``
+                                    ``char() | binary() |``
+                                    ``iolist(), binary() | [])``
+    ``mfa()``                   ``{atom(),atom(),byte()}``
+    ``no_return()``             ``none()``
+    ==========================  =====================================
+
+The user is not allowed to define types with similar names as the
+predefined or built-in ones.  This is checked by the compiler and its
+violation results in a compilation error.
+
+    *NOTE*: The following built-in list types also exist, but they are
+    expected to be rarely used. Hence, they have long names:
+
+    ::
+
+        nonempty_maybe_improper_list(Type) :: nonempty_maybe_improper_list(Type, any())
+        nonempty_maybe_improper_list() :: nonempty_maybe_improper_list(any())
+
+    where the following two types
+
+    ::
+
+        nonempty_improper_list(Type1, Type2)
+	nonempty_maybe_improper_list(Type1, Type2)
+
+    define the set of Erlang terms one would expect.
+
+Also for convenience, we allow for record notation to be used. Records
+are just shorthands for the corresponding tuples. ::
+
+    Record :: #Erlang_Atom{}
+            | #Erlang_Atom{Fields}
+
+Records have been extended to possibly contain type information. This
+is described in Section 3 below.
+
+
+Type declarations of user-defined types
+---------------------------------------
+As seen, the basic syntax of a type is an atom followed by closed
+parentheses. New types are declared using ``'type'`` compiler attributes
+as in the following::
+
+    -type(my_type() :: Type).
+
+where the type name is an atom (``'my_type'`` in the above) followed by
+parenthesis. Type is a type as defined in the previous section. A
+current restriction is that Type can contain only predefined types or
+user-defined types which have been previously defined. This
+restriction is enforced by the compiler and results in a compilation
+error. (A similar restriction currently exists for records).
+
+This means that general recursive types cannot be defined. Lifting
+this restriction is future work.
+
+Type declarations can also be parametrized by including type variables
+between the parentheses. The syntax of type variables is the same as
+Erlang variables (starts with an upper case letter). Naturally, these
+variables can - and should - appear on the RHS of the definition.
+A concrete example appears below::
+
+    -type(orddict(Key, Val) :: [{Key, Val}]).
+
+
+Type information in record declarations
+---------------------------------------
+The types of record fields can be specified in the declaration of the
+record. The syntax for this is::
+
+    -record(rec, {field1 :: Type1, field2, field3 :: Type3}).
+
+For fields without type annotations, their type defaults to ``any()``.
+I.e., the above is a shorthand for::
+
+    -record(rec, {field1 :: Type1, field2 :: any(), field3 :: Type3}).
+
+In the presence of initial values for fields, the type must be
+declared after the initialisation as in the following::
+
+    -record(rec, {field1 = [] :: Type1, field2, field3 = 42 :: Type3}).
+
+Naturally, the initial values for fields should be compatible with
+(i.e. a member of) the corresponding types. This is checked by the
+compiler and results in a compilation error if a violation is
+detected. For fields without initial values, the singleton type
+``'undefined'`` is added to all declared types. In other words, the
+following two record declarations have identical effects::
+
+    -record(rec, {f1 = 42 :: integer(),
+                  f2      :: float(),
+                  f3      :: 'a' | 'b').
+
+    -record(rec, {f1 = 42 :: integer(),
+                  f2      :: 'undefined' | float(),
+                  f3      :: 'undefined' | 'a' | 'b').
+
+For this reason, it is recommended that records contain initializers,
+whenever possible.
+
+Any record, containing type information or not, once defined, can be
+used as a type using the syntax::
+
+    #rec{}
+
+In addition, the record fields can be further specified when using a
+record type by adding type information about the field in the
+following manner::
+
+    #rec{some_field :: Type}
+
+Any unspecified fields are assumed to have the type in the original
+record declaration.
+
+
+Specifications (contracts) for functions
+----------------------------------------
+A contract (or specification) for a function is given using the new
+compiler attribute ``'spec'``. The basic format is as follows::
+
+    -spec(Module:Function/N :: (ArgType1, ..., ArgTypeN) -> ReturnType).
+
+The arity of the function has to match the number of arguments, or
+else a compilation error occurs.
+
+This form can also be used in header files (.hrl) to declare type
+information for exported functions. Then these header files can be
+included in files that (implicitly or explicitly) import these
+functions.
+
+For most uses within a given module, the following shorthand is allowed::
+
+    -spec(Function/N :: (ArgType1, ..., ArgTypeN) -> ReturnType).
+
+Also, for documentation purposes, argument names can be given::
+
+    -spec(Function/N :: (ArgName1 :: Type1, ..., ArgNameN :: TypeN) -> RT).
+
+A function specification can be overloaded. That is, it can have
+several types, separated by a semicolon (;)::
+
+    -spec(f/2 :: (T1, T2) -> T3
+               ; (T4, T5) -> T6).
+
+A current restriction, which currently results in a warning (*OBS*: not
+an error) by the compiler, is that the domains of the argument types
+cannot be overlapping. For example, the following specification
+results in a warning::
+
+    -spec(f/1 :: (pos_integer()) -> pos_integer()
+               ; (integer()) -> integer()).
+
+Type variables can be used in specifications to specify relations for
+the input and output arguments of a function. For example, the
+following specification defines the type of a polymorphic identity
+function::
+
+    -spec(id/1 :: (X) -> X).
+
+However, note that the above specification does not restrict the input
+and output type in any way. We can constrain these types by guard-like
+subtype constraints::
+
+    -spec(id/1 :: (X) -> X when is_subtype(X, tuple())).
+
+and provide bounded quantification. Currently, the ``is_subtype/2`` guard
+is the only guard which can be used in a ``'spec'`` attribute.
+
+The scope of an ``is_subtype/2`` constraint is the ``(...) -> RetType``
+specification after which it appears. To avoid confusion, we suggest
+that different variables are used in different constituents of an
+overloaded contact as in the example below::
+
+    -spec(f/1 :: ({X, integer()}) -> X when is_subtype(X, atom())
+               ; ([Y]) -> Y when is_subtype(Y, number())).
+
+
+Some functions in Erlang are not meant to return; either because they
+define servers or because they are used to throw exceptions as the
+function below::
+
+    my_error(Err) -> erlang:throw({error, Err}).
+
+For such functions we recommend the use of the special ``no_return()``
+type for their "return", via a contract of the form::
+
+    -spec(my_error/1 :: (any()) -> no_return()).
+
+
+Current limitations
+-------------------
+The main limitation is the inability to define recursive types.
+
+
+
+Copyright
+=========
+
+This document has been placed in the public domain.
+
+
+..
+   Local Variables:
+   mode: indented-text
+   indent-tabs-mode: nil
+   sentence-end-double-space: t
+   fill-column: 70
+   coding: utf-8
+   End:
+
