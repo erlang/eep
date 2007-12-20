@@ -147,7 +147,7 @@ table. (Some type unions below slightly abuse the syntax of types.)
     ``no_return()``             ``none()``
     ==========================  =====================================
 
-The user is not allowed to define types with the same names as the
+Users are not allowed to define types with the same names as the
 predefined or built-in ones.  This is checked by the compiler and its
 violation results in a compilation error.
 
