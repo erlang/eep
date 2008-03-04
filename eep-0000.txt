@@ -31,6 +31,7 @@ Numerical Index
  SA    6  New BIFs for tuple arity and binary size     Bjorn Gustavsson
  S     7  Foreign Function Interface (FFI)             Alceste Scalas
  S     8  Types and function specifications            Kostis Sagonas
+ S     9  Library for working with binaries            Fredrik Svahn
 
 Key
 
@@ -52,6 +53,7 @@ Owners
     Bjorn Gustavsson     
     Alceste Scalas       <alceste (at) crs4 (dot) it>
     Kostis Sagonas       <kostis (at) it (dot) uu (dot) se>
+    Fredrik Svahn        <Fredrik (dot Svahn (at) gmail>
 
 EEP editor(s) committee
 

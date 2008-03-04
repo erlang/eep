@@ -1,0 +1,345 @@
+EEP:            9
+Title:          Library for working with binaries
+Version:        $Revision$
+Last-Modified:  $Date$
+Author:         Fredrik Svahn <Fredrik dot Svahn at gmail>
+Status:         Draft
+Type:           Standards Track
+Content-Type:   text/plain
+Created:        28-Dec-2007
+Erlang-Version: R12B-2
+Post-History:
+
+
+Abstract
+
+    This EEP suggests the addition of a binary help library with built-in
+    functions for time critical activities such as searching and splitting
+    erlang binaries as well as library functions for common operations on
+    binaries.
+
+
+Rationale
+
+    For the lists data type there is a help library providing functions for
+    common operations such as searching and splitting lists.  This EEP suggests
+    that a similar set of library functions should be created for binaries.
+    Many of the proposed functions are based on answers to questions regarding
+    binaries on the erlang-questions mailing list, e.g. "how do I convert a
+    number to a binary?". 
+
+    
+Motivation
+
+    Since binaries are typically used for time critical activities on larger
+    amounts of data it is suggested that some operations on binaries are
+    implemented as built-in functions, BIF:s.
+
+    Specifically there seems to be a huge interest in the community for an 
+    efficient regexp implementation for searching binaries. Also for maximum
+    performance when searching and splitting binaries it is suggested that the
+    the regexp search function is complemented by a high performance function
+    for simple searches, e.g. locating and splitting binaries on newline
+    characters. Tests show that e.g. the Boyer-Moore algorithm may be 
+    significantly faster than regular expression algorithms for such purposes.
+
+    The reference implementation sent separately to the OTP team gives 
+    an indication of the expected performance improvements compared to e.g.
+    the current regular expression module for searching on lists. Some results
+    are available at the end of this EEP.
+
+
+Suggested Change
+
+    It is suggested that a new module named "binary" is added.
+
+    The new module should have the following exported functions:
+
+        match(Haystack, Needles) -> Return
+        match(Haystack, Needles, {StartIndex, EndIndex}) -> Return
+
+            Haystack = binary()       
+            Needles = binary() | [ binary() ]
+            StartIndex = integer() 
+            EndIndex = integer()
+
+            Return = Index | {NeedleNumber, Index}
+
+            Returns position of first occurence in Haystack of the first 
+            matching binary in Needles or 0 if no match. If a list of needles
+            is given the function will return a tuple with the Number of the
+            matched Needle and the position where it was found.
+
+            Haystack is searched from StartIndex to EndIndex. If StartIndex 
+            and EndIndex are not specified the default is to search Haystack 
+            from the beginning to the end.
+
+            Example:
+            > binary:match(<<"hello, world">>, <<"h">>).
+            1 
+
+            > binary:match(<<"hello,\r\n world">>, <<"world">>).
+            10 
+
+            > binary:match(<<"hello, world\n">>,[<<"\n">>,<<" ">>]).
+            {2,7}
+
+            > binary:match(<<"hello, world\n">>,[<<"\n">>,<<" ">>],{1,5}).
+            0
+
+            Suggestions on implementation: Should be implemented as one or
+            more BIF:s using e.g. Boyer-Moore, Aho-Corasick or similar 
+            efficient algorithms.
+            
+            --- Maybe binary:match(<<"hello, world\n">>,[<<"xx">>,<<" ">>])
+                should return {Needle, Index} (i.e. {<<" ">>, 7}) instead?
+                or perhaps {Index, NeedleLength} i.e. {7, 1}?
+
+        split(Binary, SplitKeys) -> List
+
+            Binary = binary()
+            SplitKeys = binary() | [binary()]
+
+            Splits Binary into a list of binaries based on matching the pattern
+            specified in the SplitKeys binary.
+
+            Example:
+            > binary:split(<<"hello,\r\n world">>, <<"\r\n">>).
+            [<<"hello,">>, <<" world">>] 
+
+            > binary:split(<<"hello,\n world">>, [<<"\n">>, <<" ">>, <<$,>>]).
+            [<<"hello">>,<<>>,<<>>,<<"world">>] 
+
+            The resulting list should basically be the same as for 
+            regexp:split/2 (with the obvious exception for special characters
+            such as "*", ".", "^", etc).
+
+
+        to_upper(Binary1) -> Binary2
+        to_lower(Binary1) -> Binary2
+
+            Similar to string:to_upper/1, to_lower/1.
+
+            --- How about Unicode? Maybe some special functions should be
+                provided for unicode support? What is wanted/needed?
+
+        binary_to_atom(Binary) -> Atom
+        atom_to_binary(Atom) -> Binary
+
+            Converts a binary to an atom and vice versa. Similar to 
+            list_to_atom/1 and atom_to_list/1.
+
+            --- More logical to place this in the erlang module?
+
+        strip(Binary1) -> Binary2
+        strip(Binary1, Direction) -> Binary2
+        strip(Binary1, Direction, Character) -> Binary2
+
+            Similar to string:strip/1,2,3
+
+            Example:
+            > binary:strip(<<"  hello, world  ">>).
+            <<"hello, world">>
+
+
+        unsigned_to_bin(Integer)-> Binary
+        bin_to_unsigned(Binary)-> Integer
+
+            Converts a positive integer to a binary and vice versa.
+
+            Example:
+            > binary:unsigned_to_bin(11111111). 
+            <<169,138,199>>
+
+            > binary:bin_to_unsigned(<<169,138,199>>).
+            11111111
+
+
+        first(Binary1)-> Binary2
+        first(SizeBytes, Binary1)-> Binary2
+
+            Returns a binary with the first byte or the SizeBytes first bytes
+            in Binary1. 
+
+            Example:
+            > binary:first(2, <<"abc">>).                                  
+            <<"ab">>
+
+
+        last(Binary1)-> Binary2.
+        last(SizeBytes, Binary1)-> Binary2
+
+            Returns a binary with the last byte or the SizeBytes last bytes
+            in Binary1. 
+
+            Example:
+            > binary:last(2, <<"abc">>).                                  
+            <<"bc">>
+
+
+        nth(N, Bin)-> Value
+        nth(N, Size, Binary) -> Value
+
+            N = integer(), 1 =< N =< size(Binary)
+            Value = binary()
+
+            Extracts a binary at position N from Binary. Same as
+
+            T = N-1,
+            <<_:T/binary, Value:Size/binary, _/binary>> = Binary, 
+            Value.
+
+            although this function is somewhat shorter and easier to write.
+
+            --- Consider naming it "extract"?
+
+        duplicate(N, Byte)-> Binary
+
+            Similar to lists:duplicate/2. Creates a new binary consisting of
+            Byte repeated N times. 
+
+            Example:
+            > binary:duplicate(5, $a).
+            <<"aaaaa">>
+
+
+        regex_match(Bin, RegExp)-> Return
+        regex_match(Bin, ParseRes, {StartIndex, EndIndex})-> Return
+
+            Bin = binary()
+            Regexp = string() 
+            Return = 0 | {Start, Length}
+
+            Finds the first, longest match of the regular expression RegExp 
+            in Bin. This function searches for the longest possible match 
+            and returns the first one found if there are several expressions 
+            of the same length.
+       
+            Example:
+            > binary:regex_match(<<"abcde">>, "b?c(d|x)").
+            {2,3}
+
+            Suggestions on implementation: The algorithm provided as a built 
+            in function in the reference implementation was inspired by the 
+            original Thompson NFA algorithm [3] and the syntax used above for
+            regexps is the same as in the regexp module in R12B where 
+            parentheses are used for grouping. 
+
+            During a first round of feedback it has been suggested that the 
+            final implementation should be a built in function based on the 
+            Perl Compatible Regular Expressions (PCRE) library [1] instead  
+            as PCRE is much richer on functionality, is well supported, and 
+            is more or less considered a standard today. 
+
+            PCRE has two basic modes of operation, an NFA based back-tracking
+            algorithm and an alternative DFA based algorithm [2]. The former
+            supports capturing of subpatterns by parentheses. If capturing is 
+            used it is suggested that the captured subpatterns are returned 
+            as a third element in the Return tuple, i.e:
+
+            Return = 0 | {Start, Length, [CapturedPatterns]}
+
+            > binary:regex_match(<<"127.0.0.1">>, "(\d*)\.(\d*)\.").
+            {1,6,[<<"127">>, <<"0">>]}
+
+            Open questions: 
+             - if PCRE is used it might be a good idea to add an Options
+               parameter (optional of course), e.g. to specify that the 
+               partial matching feature should be activated
+             - it might be a good idea performance-wise to have compilation 
+               of a regexp separate from the execution for multiple searches 
+               with the same patterns, e.g.
+               CPattern = binary:regex_compile("(\d*)"),
+               Result1 = binary:regex_match(Bin1, CPattern),
+               Result2 = binary:regex_match(Bin2, CPattern),
+               Result3 = ...
+             - handling of utf-8.
+             - it might be argued that the regexp functions should go into
+               the regexp module, I guess this depends on if the PCRE-based
+               implementation can be applied to lists as well as binaries.
+
+        regex_matches(Bin, RegExp)-> Return
+        regex_matches(Bin, ParseRes, {StartIndex, EndIndex})-> Return
+
+            Bin = binary()
+            Regexp = string() 
+            Return = 0 | {Start, Length}
+
+            Finds all matches of the regular expression RegExp in Bin. 
+
+            Example:
+            > binary:regex_matches(<<"aaa">>, "a").
+            [{1,1},{2,1},{3,1}]
+
+        regex_sub(Binary1, RegExp, New)-> Binary2
+            
+            Binary1, Binary2 = binary()
+            New = string()
+            Regexp = string() 
+            
+            Substitutes the first occurence of a substring matching RegExp
+            in Binary1 with the string New. A & in the string New is replaced 
+            by the matched substring of String. \& puts a literal & into the 
+            replacement string.
+
+        regex_gsub(Binary1, RegExp, New)-> Binary2
+
+            Same as regex_sub except that all non-overlapping occurrences of 
+            a substring matching RegExp in Binary1 are replaced by the 
+            string New.
+
+
+Performance
+
+    Performance measurements were performed on the functions considered most 
+    important using the reference implementation. Some examples:
+
+    1. Searching for a non-existing 1 and 3 byte binary in a ~1 Mb binary. 
+    Notice how binary:match/2 gets faster the longer the needle is thanks to 
+    the O(n/m) algorithm. All times in microseconds.
+
+                 Search for:  1 byte   3 bytes   
+        binary:match/2:        17598      6045 
+        binary:regex_first/2:  47299     46701
+        string:str/2:          68969     69637
+        regexp:first_match/2: 460858    887485
+
+
+    2. Splitting a ~1 Mb binary on newline chars. This particular binary 
+    contained a newline every 60 chars on average.
+
+        binary:split/2:  89142 microseconds
+        regexp:split/2: 564911 microseconds
+
+    3. Regex-DNA benchmark from computer language shootout
+
+        prototype regexp bif:    1.9 seconds
+        regexp module in R12B:  99.1 seconds
+
+    In the examples at the computer language shootout PCRE has a slightly 
+    lower performance compared to other algorithms such as the one in the 
+    reference implementation or in particular the one featured in TCL. This
+    may not necessarily mean that this is true for all types of patterns.
+
+
+Reference implementation
+
+    A reference implementation has been provided to the OTP team.
+
+
+    References
+
+    [1] http://en.wikipedia.org/wiki/PCRE
+
+    [2] see man page for pcrematching, also available here:
+        http://www.pcre.org/pcre.txt
+
+    [3] http://swtch.com/~rsc/regexp/regexp1.html
+
+Copyright
+
+    This document is licensed under the Creative Commons license.
+
+
+
+
