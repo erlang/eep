@@ -76,7 +76,7 @@ Not Included
     - Changes to the string module
 
 
-The "binary_strings" Module
+The "binary_string" Module
 
     The binary_string module should be based on the current string module but 
     should operate on strings represented by binaries as opposed to the 
@@ -520,12 +520,12 @@ Reference implementation
 
 References
 
-[1] http://en.wikipedia.org/wiki/PCRE
+    [1] http://en.wikipedia.org/wiki/PCRE
 
-[2] see man page for pcrematching, also available here:
-    http://www.pcre.org/pcre.txt
+    [2] see man page for pcrematching, also available here:
+        http://www.pcre.org/pcre.txt
 
-[3] http://swtch.com/~rsc/regexp/regexp1.html
+    [3] http://swtch.com/~rsc/regexp/regexp1.html
 
 Copyright
 
