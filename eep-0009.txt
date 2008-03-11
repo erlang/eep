@@ -515,7 +515,7 @@ Performance
 
 Reference implementation
 
-A reference implementation has been provided to the OTP team.
+    A reference implementation has been provided to the OTP team.
 
 
 References
