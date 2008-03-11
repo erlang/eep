@@ -1,4 +1,4 @@
-EEP:            9
+EEP:            0009
 Title:          Library for working with binaries
 Version:        $Revision$
 Last-Modified:  $Date$
@@ -13,10 +13,11 @@ Post-History:
 
 Abstract
 
-    This EEP suggests the addition of a binary help library with built-in
+    This EEP suggests the addition of two binary help libraries with built-in
     functions for time critical activities such as searching and splitting
     erlang binaries as well as library functions for common operations on
-    binaries.
+    binaries. The EEP also suggest the addition of a regular expressions
+    library using built in functions.
 
 
 Rationale
@@ -43,123 +44,270 @@ Motivation
     characters. Tests show that e.g. the Boyer-Moore algorithm may be 
     significantly faster than regular expression algorithms for such purposes.
 
+    When reviewing the EEP it is clear that there is also a strong demand for
+    string operations on binaries for better performance. 
+
     The reference implementation sent separately to the OTP team gives 
     an indication of the expected performance improvements compared to e.g.
     the current regular expression module for searching on lists. Some results
     are available at the end of this EEP.
 
 
-Suggested Change
+Suggested Changes
 
-    It is suggested that a new module named "binary" is added.
+    This EEP suggests the addition of two new modules; one module named
+    binary and one called binary_string.
 
-    The new module should have the following exported functions:
+    The EEP also suggests a new regular expression library based on Perl
+    Compatible Regular Expressions (PCRE). The library should be able to 
+    operate both on binary_strings and on strings.
 
-        match(Haystack, Needles) -> Return
-        match(Haystack, Needles, {StartIndex, EndIndex}) -> Return
+    Finally, the following functions should be added to the erlang module:
 
-            Haystack = binary()       
-            Needles = binary() | [ binary() ]
-            StartIndex = integer() 
-            EndIndex = integer()
+        binary_to_atom(Binary) -> Atom
+        atom_to_binary(Atom) -> Binary
+        binary_to_existing_atom(Binary) -> Atom
 
+
+Not Included
+
+    At the moment the following is not included in the EEP:
+    - Support for different encodings, e.g. UTF-8
+    - Changes to the string module
+
+
+The "binary_strings" Module
+
+    The binary_string module should be based on the current string module but 
+    should operate on strings represented by binaries as opposed to the 
+    current strings module which operates on strings represented by lists.
+
+    Apart from operating on binaries the interface of binary_string should be 
+    the same as for string with the following exceptions:
+
+        1.  str/2 and rstr/2 should be modified to optionally take a list of 
+            binaries or a MatchSpec such as the one returned by 
+            binary:match_compile/2 as second argument. If the Keys argument 
+            corresponds to several keys the function should return a tuple
+            indicating the Key that matched and the matching Index, i.e. 
+
+        str(Binary, Keys) -> Return
+        rstr(Binary, Keys) -> Return
+    
+            Binary = binary()
+            Keys = Key | [ Key ] | MatchSpec
+            Key = string() | binary()
+            MatchSpec = tuple() as returned by binary:match_compile/1
             Return = Index | {NeedleNumber, Index}
+            Index = integer()
 
-            Returns position of first occurence in Haystack of the first 
-            matching binary in Needles or 0 if no match. If a list of needles
-            is given the function will return a tuple with the Number of the
-            matched Needle and the position where it was found.
+            str/rstr should be implemented as built-in functions using 
+            efficient algorithms such as Boyer-Moore, Aho-Corasick or
+            similar. Typically the function could be built on binary:match/2.
 
-            Haystack is searched from StartIndex to EndIndex. If StartIndex 
-            and EndIndex are not specified the default is to search Haystack 
+        2.  A new function split should be added. It should behave as tokens/2
+            but take a list of separator binaries/strings instead of a list of
+            separator characters.
+
+        split(Binary, SplitKeys) -> List
+
+            Binary = binary()
+            SplitKeys = Key | [ Key ] | MatchSpec
+            Key = string() | binary()
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            List = [ binary() ]
+
+            Splits Binary into a list of binaries based on matching the pattern
+            specified in the SplitKeys binary.
+
+            Examples:
+            > binary_string:split(<<"cat and dog">>, <<"and">>).
+            [<<"cat ">>, <<" dog">>] 
+
+            > binary_string:split(<<"cat and dog">>, "and").
+            [<<"cat ">>, <<" dog">>] 
+
+            > binary_string:split(<<"cat and dog">>,["a","n",<<"d">>]).
+            [<<"c">>,<<"t ">>,<<" ">>,<<"og">>]
+
+            The resulting list should be the same as for regexp:split/2 
+            (with the obvious exception for special characters such as "*", 
+            ".", "^", etc).
+
+            Please note that the third example should give the same result as
+            binary_string:tokens(<<"cat and dog">>, "and"). 
+
+        3.  The new functions substitute and globally_substitute should be 
+            added. 
+
+        substitute(OldBinary, Key, Replacement)-> NewBinary
+            
+            OldBinary, NewBinary, Replacement = binary()
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            
+            Creates a binary NewBinary from OldBinary by substituting the 
+            first occurence of any of the binaries in Keys in OldBinary
+            with the Replacement binary. 
+
+            The Replacement binary need not have the same size as the matched 
+            Key.
+
+            Example:
+            > binary_string:substitute(<<"cat anf dog">>,<<"anf">>,<<"and">>).
+            [<<"cat and dog">>] 
+
+        globally_substitute(OldBinary, Key, Replacement)-> NewBinary
+
+            OldBinary, NewBinary, Replacement = binary()
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+
+            Same as substitute except that all non-overlapping occurrences of 
+            a subbinary in OldBinary are replaced by the Replacement binary.
+
+
+
+    It is suggested that the same functions are also added to the string
+    module, but this is out of the scope of this EEP.
+
+The "binary" Module
+
+    The interface of the binary module should have the following exported 
+    functions (please note that some functions are intentionally the same as
+    in binary_string since it is believed they can be useful both for string
+    and binary data manipulation):
+
+        match(Binary, Keys) -> Return
+        match(Binary, Keys, {StartIndex, EndIndex}) -> Return
+
+            Binary = binary()
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            StartIndex = EndIndex = integer()
+
+            Return = Index | {KeyNumber, Index}
+            Index = KeyNumber = integer()
+
+            Returns position of first occurence in Binary of the first 
+            matching binary in Keys or 0 if no match. If a list of keys
+            is given, the function will return a tuple with the KeyNumber of
+            the matched Key and the position in Binary where it was found.
+
+            There has been a discussion on whether the function should return
+            the matched Key instead of the KeyNumber. Returning the KeyNumber
+            should be slightly more efficient, and since the matched key
+            can easily be retrieved by lists:nth(KeyNumber, Keys) if needed it
+            is suggested that the function returns the KeyNumber.
+
+            Binary is searched from StartIndex to EndIndex. If StartIndex 
+            and EndIndex are not specified the default is to search Binary 
             from the beginning to the end.
 
             Example:
-            > binary:match(<<"hello, world">>, <<"h">>).
-            1 
+            > binary:match(<<1,2,3,0,0,0,4>>, <<0,0,0>>).
+            4 
 
-            > binary:match(<<"hello,\r\n world">>, <<"world">>).
-            10 
-
-            > binary:match(<<"hello, world\n">>,[<<"\n">>,<<" ">>]).
-            {2,7}
-
-            > binary:match(<<"hello, world\n">>,[<<"\n">>,<<" ">>],{1,5}).
-            0
+            > binary:match(<<1,2,255,0,0,0,4,255>>, [<<0,0,0>>, <<255>>]).
+            {2, 3}
 
             Suggestions on implementation: Should be implemented as one or
             more BIF:s using e.g. Boyer-Moore, Aho-Corasick or similar 
             efficient algorithms.
             
-            --- Maybe binary:match(<<"hello, world\n">>,[<<"xx">>,<<" ">>])
-                should return {Needle, Index} (i.e. {<<" ">>, 7}) instead?
-                or perhaps {Index, NeedleLength} i.e. {7, 1}?
-
-        split(Binary, SplitKeys) -> List
+        matches(Binary, Keys) -> Return
+        matches(Binary, Keys, {StartIndex, EndIndex}) -> Return
 
             Binary = binary()
-            SplitKeys = binary() | [binary()]
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            StartIndex = EndIndex = integer() 
+
+            Return = [ Index ] | [ {KeyNumber, Index} ]
+            Index = KeyNumber = integer()
+
+            Finds all matches of the Keys in Haystack. Returns a list of the
+            indexes for all non-overlapping ocurrences of the key or keys.
+
+        split(Binary, SplitKeys) -> List
+        split(Binary, SplitKeys, {StartIndex, EndIndex}) -> List
+
+            Binary = binary()
+            SplitKeys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            StartIndex = EndIndex = integer()
+
+            List = [ binary() ]
 
             Splits Binary into a list of binaries based on matching the pattern
-            specified in the SplitKeys binary.
+            specified in SplitKeys.
 
             Example:
-            > binary:split(<<"hello,\r\n world">>, <<"\r\n">>).
-            [<<"hello,">>, <<" world">>] 
+            > binary:split(<<1,255,4,0,0,0,2,3>>, <<0,0,0>>).
+            [<<1,255,4>>, <<2,3>>] 
 
-            > binary:split(<<"hello,\n world">>, [<<"\n">>, <<" ">>, <<$,>>]).
-            [<<"hello">>,<<>>,<<>>,<<"world">>] 
+            > binary:split(<<0,1,0,0,4,255,255,9>>, [<<0,0>>, <<255,255>>]).
+            [<<0,1>>,<<4>>,<<9>>] 
 
             The resulting list should basically be the same as for 
             regexp:split/2 (with the obvious exception for special characters
             such as "*", ".", "^", etc).
 
+            The binaries in List are all subbinaries of Binary meaning that
+            the data in Binary is not actually copied to new binaries.
 
-        to_upper(Binary1) -> Binary2
-        to_lower(Binary1) -> Binary2
+        substitute(OldBinary, Key, Replacement)-> NewBinary
+            
+            OldBinary, NewBinary, Replacement = binary()
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
+            
+            Creates a binary NewBinary from OldBinary by substituting the 
+            first occurence of any of the binaries in Keys in OldBinary
+            with the Replacement binary. 
 
-            Similar to string:to_upper/1, to_lower/1.
+            The Replacement binary need not have the same size as the matched 
+            Key.
 
-            --- How about Unicode? Maybe some special functions should be
-                provided for unicode support? What is wanted/needed?
+        globally_substitute(OldBinary, Key, Replacement)-> NewBinary
 
-        binary_to_atom(Binary) -> Atom
-        atom_to_binary(Atom) -> Binary
+            OldBinary, NewBinary, Replacement = binary()
+            Keys = binary() | [ binary() ] | MatchSpec
+            MatchSpec = tuple() as returned by binary:match_compile/1
 
-            Converts a binary to an atom and vice versa. Similar to 
-            list_to_atom/1 and atom_to_list/1.
+            Same as substitute except that all non-overlapping occurrences of 
+            a subbinary in OldBinary are replaced by the Replacement binary.
 
-            --- More logical to place this in the erlang module?
+        match_compile(Keys) -> MatchSpec
 
-        strip(Binary1) -> Binary2
-        strip(Binary1, Direction) -> Binary2
-        strip(Binary1, Direction, Character) -> Binary2
+            Keys = binary() | [ binary() ] 
+            MatchSpec = tuple() 
 
-            Similar to string:strip/1,2,3
+            Builds an internal structure representing one or more search
+            keys. The MatchSpec structure can be used to speed up searching if
+            multiple searches with binary:match/2 or binary_string:str/2
+            are to be performed with the same search keywords.
+
+
+        binary:from_unsigned(Integer)-> Binary
+        binary:to_unsigned(Binary)-> Integer
+
+            Converts a positive integer the smallest possible representation
+            in the binary data type format and vice versa.
 
             Example:
-            > binary:strip(<<"  hello, world  ">>).
-            <<"hello, world">>
-
-
-        unsigned_to_bin(Integer)-> Binary
-        bin_to_unsigned(Binary)-> Integer
-
-            Converts a positive integer to a binary and vice versa.
-
-            Example:
-            > binary:unsigned_to_bin(11111111). 
+            > binary:from_unsigned(11111111). 
             <<169,138,199>>
 
-            > binary:bin_to_unsigned(<<169,138,199>>).
+            > binary:to_unsigned(<<169,138,199>>).
             11111111
 
 
         first(Binary1)-> Binary2
         first(SizeBytes, Binary1)-> Binary2
 
-            Returns a binary with the first byte or the SizeBytes first bytes
-            in Binary1. 
+            Returns a subbinary with the first byte or the SizeBytes first 
+            bytes in Binary1. 
 
             Example:
             > binary:first(2, <<"abc">>).                                  
@@ -169,7 +317,7 @@ Suggested Change
         last(Binary1)-> Binary2.
         last(SizeBytes, Binary1)-> Binary2
 
-            Returns a binary with the last byte or the SizeBytes last bytes
+            Returns a subbinary with the last byte or the SizeBytes last bytes
             in Binary1. 
 
             Example:
@@ -177,13 +325,12 @@ Suggested Change
             <<"bc">>
 
 
-        nth(N, Bin)-> Value
-        nth(N, Size, Binary) -> Value
+        nth(N, Binary) -> Value
 
             N = integer(), 1 =< N =< size(Binary)
-            Value = binary()
+            Value = integer()
 
-            Extracts a binary at position N from Binary. Same as
+            Extracts a byte at position N from Binary. Same as
 
             T = N-1,
             <<_:T/binary, Value:Size/binary, _/binary>> = Binary, 
@@ -191,7 +338,25 @@ Suggested Change
 
             although this function is somewhat shorter and easier to write.
 
-            --- Consider naming it "extract"?
+        extract(N, Size, Binary) -> SubBinary
+
+            N = integer(), 1 =< N =< size(Binary)
+            Size = integer()
+            SubBinary = subbinary()
+
+            Returns a subbinary of size Size starting at position N from 
+            Binary. No data is copied in this operation.
+
+            It has been discussed if there should be a function for copying
+            a part of a binary rather than getting a subbinary. This would
+            make it possible to get a small part of a binary and let the
+            rest be garbage collected. Since it is possible to achieve the same
+            result by converting the extracted part to a list and then back
+            again to a binary and it is a very specialized operation which
+            may confuse new users it has been excluded at this stage.
+
+            When talking to designers many seem to prefer the name extract
+            over the name subbinary for this function.
 
         duplicate(N, Byte)-> Binary
 
@@ -203,95 +368,121 @@ Suggested Change
             <<"aaaaa">>
 
 
-        regex_match(Bin, RegExp)-> Return
-        regex_match(Bin, ParseRes, {StartIndex, EndIndex})-> Return
 
-            Bin = binary()
-            Regexp = string() 
-            Return = 0 | {Start, Length}
+
+The Regular Expressions Library
+
+        It is suggested that a new regular expression library based on
+        built in functions is added. It should have the following interface
+        functions (name of the module to be decided, for backwards
+        compatibility reasons it should probably exists in parallell with
+        the old regexp module):
+
+        During a first round of feedback it has been suggested that the 
+        final implementation should be a built in function based on the 
+        Perl Compatible Regular Expressions (PCRE) library [1]. It is 
+        optimised, well supported, and is more or less considered a standard 
+        today. It is used in a number of prominent products and projects, e.g.
+        Apples Safari, Apache, KDE, PHP, Postfix and Nmap.
+
+        It is suggested that the module has the following exported functions:
+
+        compile(Regex) -> MatchSpec
+
+            Regex = string()
+            MatchSpec = tuple() 
+
+            Builds an internal structure representing one or more search
+            keys. The MatchSpec structure can be used to speed up searching if
+            multiple searches are to be performed with the same search 
+            keywords.
+
+        match(BinOrString, RegExp)-> Return
+        match(BinOrString, RegExp, {StartIndex, EndIndex})-> Return
+
+            BinOrString = binary() | string()
+            RegExp = string() | MatchSpec
+            MatchSpec = tuple() as returned by match_compile/1
+            StartIndex = EndIndex = integer()
+            Return = 0 | {Start, Length, [CapturedPatterns]}
 
             Finds the first, longest match of the regular expression RegExp 
-            in Bin. This function searches for the longest possible match 
-            and returns the first one found if there are several expressions 
-            of the same length.
-       
-            Example:
-            > binary:regex_match(<<"abcde">>, "b?c(d|x)").
-            {2,3}
+            in BinOrString. This function searches for the longest possible 
+            match and returns the first one found if there are several 
+            expressions of the same length.
 
-            Suggestions on implementation: The algorithm provided as a built 
-            in function in the reference implementation was inspired by the 
-            original Thompson NFA algorithm [3] and the syntax used above for
-            regexps is the same as in the regexp module in R12B where 
-            parentheses are used for grouping. 
+            The function supports pattern capturing. Patterns captured (if
+            any) are returned in a list in the Return tuple.
 
-            During a first round of feedback it has been suggested that the 
-            final implementation should be a built in function based on the 
-            Perl Compatible Regular Expressions (PCRE) library [1] instead  
-            as PCRE is much richer on functionality, is well supported, and 
-            is more or less considered a standard today. 
-
-            PCRE has two basic modes of operation, an NFA based back-tracking
-            algorithm and an alternative DFA based algorithm [2]. The former
-            supports capturing of subpatterns by parentheses. If capturing is 
-            used it is suggested that the captured subpatterns are returned 
-            as a third element in the Return tuple, i.e:
-
-            Return = 0 | {Start, Length, [CapturedPatterns]}
+            Examples:
+            > binary:regex_match(<<"abcde">>, "b?cd").
+            {2,3,[]}
 
             > binary:regex_match(<<"127.0.0.1">>, "(\d*)\.(\d*)\.").
             {1,6,[<<"127">>, <<"0">>]}
 
             Open questions: 
-             - if PCRE is used it might be a good idea to add an Options
-               parameter (optional of course), e.g. to specify that the 
-               partial matching feature should be activated
-             - it might be a good idea performance-wise to have compilation 
-               of a regexp separate from the execution for multiple searches 
-               with the same patterns, e.g.
-               CPattern = binary:regex_compile("(\d*)"),
-               Result1 = binary:regex_match(Bin1, CPattern),
-               Result2 = binary:regex_match(Bin2, CPattern),
-               Result3 = ...
-             - handling of utf-8.
-             - it might be argued that the regexp functions should go into
-               the regexp module, I guess this depends on if the PCRE-based
-               implementation can be applied to lists as well as binaries.
+             - It might be a good idea to add an Options parameter (optional 
+               of course), e.g. to specify that the partial matching feature 
+               should be activated
+             - handling of Encodings.
 
-        regex_matches(Bin, RegExp)-> Return
-        regex_matches(Bin, ParseRes, {StartIndex, EndIndex})-> Return
+        matches(BinOrString, RegExp)-> Return
+        matches(BinOrString, RegExp, {StartIndex, EndIndex})-> Return
 
-            Bin = binary()
-            Regexp = string() 
-            Return = 0 | {Start, Length}
+            BinOrString = binary() | string()
+            RegExp = string() | MatchSpec
+            MatchSpec = tuple() as returned by match_compile/1
+            StartIndex = EndIndex = integer()
 
-            Finds all matches of the regular expression RegExp in Bin. 
+            Return = 0 | [ {Start, Length, [CapturedPatterns]} ]
+
+            Finds all matches of the regular expression RegExp in BinOrString. 
 
             Example:
             > binary:regex_matches(<<"aaa">>, "a").
-            [{1,1},{2,1},{3,1}]
+            [{1,1,[]},{2,1,[]},{3,1,[]}]
 
-        regex_sub(Binary1, RegExp, New)-> Binary2
+        sub(BinOrString, RegExp, Replacement)-> NewStringOrBinary
             
-            Binary1, Binary2 = binary()
-            New = string()
-            Regexp = string() 
-            
-            Substitutes the first occurence of a substring matching RegExp
-            in Binary1 with the string New. A & in the string New is replaced 
-            by the matched substring of String. \& puts a literal & into the 
-            replacement string.
+            BinOrString = NewStringOrBinary = binary() | string()
+            RegExp = string() | MatchSpec
+            MatchSpec = tuple() as returned by match_compile/1
+            Replacement = string()
 
-        regex_gsub(Binary1, RegExp, New)-> Binary2
+            Substitutes the first occurence of a substring or subbinary 
+            matching RegExp in BinOrString with Replacement. A & in the 
+            Replacement string is replaced by the matched substring or
+            subbinary of BinOrString. \& puts a literal & into the 
+            replacement string or binary. The type of NewStringOrBinary
+            will be the same as the type of BinOrString.
 
-            Same as regex_sub except that all non-overlapping occurrences of 
-            a substring matching RegExp in Binary1 are replaced by the 
-            string New.
+        gsub(BinOrString, RegExp, Replacement)-> Binary2
+
+            Same as sub except that all non-overlapping occurrences of 
+            a substring or subbinary matching RegExp in BinOrString are 
+            replaced by the string Replacement.
+
+        split(BinOrString, RegExp) -> List
+        split(BinOrString, RegExp, {StartIndex, EndIndex}) -> List
+
+            BinOrString = binary() | string()
+            RegExp = string() | MatchSpec
+            MatchSpec = tuple() as returned by match_compile/1
+            StartIndex = EndIndex = integer()
+
+            List = [ binary() ]
+
+            Splits Binary into a list of binaries based on the pattern
+            specified in RegExp.
+
+            The resulting list should basically be the same as for 
+            regexp:split/2. 
 
 
 Performance
 
-    Performance measurements were performed on the functions considered most 
+    Performance was measured for the functions considered most 
     important using the reference implementation. Some examples:
 
     1. Searching for a non-existing 1 and 3 byte binary in a ~1 Mb binary. 
@@ -324,17 +515,17 @@ Performance
 
 Reference implementation
 
-    A reference implementation has been provided to the OTP team.
+A reference implementation has been provided to the OTP team.
 
 
-    References
+References
 
-    [1] http://en.wikipedia.org/wiki/PCRE
+[1] http://en.wikipedia.org/wiki/PCRE
 
-    [2] see man page for pcrematching, also available here:
-        http://www.pcre.org/pcre.txt
+[2] see man page for pcrematching, also available here:
+    http://www.pcre.org/pcre.txt
 
-    [3] http://swtch.com/~rsc/regexp/regexp1.html
+[3] http://swtch.com/~rsc/regexp/regexp1.html
 
 Copyright
 
