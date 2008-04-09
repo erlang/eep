@@ -18,20 +18,20 @@ Introduction
 
 Numerical Index
 
-     num  title                                        owner
-     ---  -----                                        -----
+     num  title                                          owner
+     ---  -----                                          -----
 
- P     0  Index of Erlang Enhancement Proposals        Raimo Niskanen
- P     1  EEP Purpose and Guidelines                   Per Gustafsson
- P     2  Sample Plaintext EEP Template                Per Gustafsson
- P     3  Sample reStructuredText EEP Template         Per Gustafsson
+ P     0  Index of Erlang Enhancement Proposals (EEPs)   Raimo Niskanen
+ P     1  EEP Purpose and Guidelines                     Per Gustafsson
+ P     2  Sample Plaintext EEP Template                  Per Gustafsson
+ P     3  Sample reStructuredText EEP Template           Per Gustafsson
 
- SA    4  New BIFs for bit-level binaries (bitstrs)    Per Gustafsson
- S     5  More Versatile Encapsulation with export_to  Per Gustafsson
- SA    6  New BIFs for tuple arity and binary size     Bjorn Gustavsson
- S     7  Foreign Function Interface (FFI)             Alceste Scalas
- S     8  Types and function specifications            Kostis Sagonas
- S     9  Library for working with binaries            Fredrik Svahn
+ SA    4  New BIFs for bit-level binaries (bit strings)  Per Gustafsson
+ S     5  More Versatile Encapsulation with export_to    Per Gustafsson
+ SA    6  New BIFs for tuple and binary sizes            Bjorn Gustavsson
+ S     7  Foreign Function Interface (FFI)               Alceste Scalas
+ S     8  Types and function specifications              Kostis Sagonas
+ S     9  Library for working with binaries              Fredrik Svahn
 
 Key
 
