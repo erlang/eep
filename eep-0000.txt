@@ -32,6 +32,7 @@ Numerical Index
  S     7  Foreign Function Interface (FFI)               Alceste Scalas
  S     8  Types and function specifications              Kostis Sagonas
  S     9  Library for working with binaries              Fredrik Svahn
+ S    10  Representing Unicode characters in Erlang      Patrik Nyblom
 
 Key
 
@@ -53,7 +54,8 @@ Owners
     Bjorn Gustavsson     
     Alceste Scalas       <alceste (at) crs4 (dot) it>
     Kostis Sagonas       <kostis (at) it (dot) uu (dot) se>
-    Fredrik Svahn        <Fredrik (dot Svahn (at) gmail>
+    Fredrik Svahn        <Fredrik (dot) Svahn (at) gmail>
+    Patrik Nyblom
 
 EEP editor(s) committee
 

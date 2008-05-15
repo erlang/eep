@@ -1,0 +1,499 @@
+EEP: 10
+Title: Representing Unicode characters in Erlang
+Version: $Id: unicode_in_erlang.txt,v 1.7 2008/05/14 10:26:20 pan Exp $
+Last-Modified: $Date$
+Author: Patrik Nyblom
+Status: Draft
+Type: Standards Track
+Created: 07-05-2008
+Erlang-Version: R12B-4
+Post-History: 01-jan-1970
+
+Abstract
+========
+
+This EEP suggest a standard representation of Unicode [2]_ characters in
+Erlang, as well as the basic functionality to deal with them.
+
+Motivation
+==========
+
+As Unicode characters are more widely used, the need for a common
+representation of Unicode characters in Erlang arise. Up until now,
+the Erlang programmer writing Unicode programs has to decide on
+his or her own representation and has little or no help from the
+standard libraries. 
+
+Implementing functions in the libraries dealing with all possible
+combinations and variants of Unicode representation in Erlang is
+considered both extremely time consuming and confusing to the future
+user of the standard library.
+
+One common representation, dealing both with binaries and lists is
+therefore desirable, making Unicode handling in the standard libraries
+easier to implement and giving a more stringent result.
+
+Once the representation is agreed upon, implementation can be done
+incrementally. This EEP only outlines the most basic functionality the
+system should provide. The Unicode support is by no means complete if
+this EEP is implemented, but implementation will be feasible.
+
+Rationale
+=========
+
+Preconditions
+-------------
+
+Erlang traditionally represents text strings as lists of bytes (8bit
+entities),  where the characters are encoded in ISO-8859-1 (latin1). 
+
+As the use of Unicode characters gets more widely spread, the demand
+for a common view of how to represent Unicode characters in Erlang
+arise.
+
+Unicode is a character encoding standard where all known, living and
+historical written languages are represented in one single character
+set, which of course results in characters demanding more than eight
+bits each for representation.
+
+Lists
+-----
+
+Regardless of the representation, the Unicode character set is a
+super-set of the latin1 ditto, while latin1 in it's turn is a super-set
+of the traditional 7-bit US-ASCII character set. Representing Unicode
+characters in Erlang lists is therefore quite naturally done by
+allowing characters in lists to take on values higher than 255.
+
+Therefore a Unicode string can, in Erlang, be conveniently stored
+as a list where each element represents one single Unicode
+character. The following list:
+
+.. _ex1:
+
+    [1050,1072,1082,1074,
+     1086,32,1077,32,85,110,105,99,111,100,101,32,63] 
+
+\- would represent the Bulgarian translation of "What is Unicode ?" (which
+looks something like like "KAKBO e Unicode ?" with only the last part
+in latin letters). The last part
+([32,85,110,105,99,111,100,101,32,63]) is plain latin1 as the string
+"Unicode ?" is written in latin letters, while the first part contains
+characters not to be represented in a single byte. In essence, the
+string is encoded in the Unicode encoding standard UTF-32, one
+32bit entity for each character, which is more than sufficient for one
+Unicode character per position.
+
+However, the currently most common representation of Unicode
+characters is UTF-8 [1]_, in which the characters are stored in one to
+four 8-bit entities organized in such way that plain 7-bit US ASCII is
+untouched, while characters 128 and upwards are split over more than
+one byte. The advantage of this coding is that e.g. characters having
+a meaning to the file/operating system are kept intact and that many
+strings in western languages do not occupy more space when transformed
+into Unicode. In such an encoding, the above mentioned Bulgarian
+string (ex1_) would be represented as the list
+[208,154,208,176,208,186,208,178,208,
+190,32,208,181,32,85,110,105,99,111,100,101,32,63], where the first
+part, containing the Bulgarian script letters occupy more bytes per
+character, while the trailing part "Unicode ?" is identical to the
+plain and more intuitive encoding of one character per list element.
+
+In spite of being less intuitive, the UTF-8 encoding is the one most
+widely spread and supported by operating systems and terminal
+emulators. UTF-8 is therefore the most convenient way to communicate
+text to external entities (files, drivers, terminals and so on).
+
+When dealing with lists in Erlang, the advantages of using one list
+element per character seems to be greater than the advantage of not
+having to convert a UTF-8 character string before e.g. printing
+it on a terminal. This is especially true as the current Erlang
+implementation allows for all current Unicode characters to
+occupy the same memory space as a latin1 character would (bearing in
+mind that each character is represented as an integer and the list
+element can contain integers up to 16#7ffffff on 32-bit
+implementations, which is far larger than the largest current Unicode
+character 16#10ffff). A further advantage is that routines like
+io:format can easily cope with latin1 characters and Unicode
+characters alike, as the eight-bit characters of Unicode happen
+to correspond exactly to the latin1 character set. It would seem as
+lists have a very natural way of dealing with Unicode characters.
+
+Binaries
+--------
+
+Binaries on the other hand would suffer greatly from a scheme where
+every character is encoded with a fixed width capable of representing
+numbers up to 16#10ffff. The standardized way of doing this would be
+what's commonly referred to as UTF-32, i.e. one 32-bit word for each
+character. Even a UTF-16 representation would guarantee to double the
+memory requirements for all text strings encoded in binaries, while
+UTF-8 would for most common cases be the most space-saving
+representation. 
+
+Binaries are often used to represent data to be sent
+to external programs, which also speaks in favor of the UTF-8
+representation. 
+
+There are however problems with the UTF-8 representation, most
+obviously the fact that characters occupy a variable number of
+positions (bytes) in the binary, so that traversal is somewhat more
+tedious. An extension to the bit syntax where UTF-8 characters can be
+matched in the head of a string conveniently would ease up the
+situation, but as of today, no such primitives are present. UTF-8
+encoded characters are also only backward compatible with 7-bit US-ASCII,
+and there are only probabilistic approaches to determining if a
+sequence of bytes represent Unicode characters encoded as UTF-8 or
+plain latin1. A library function in Erlang therefore needs to be
+informed about the way characters are encoded in a binary to be able
+to interpret them correctly. A latin1 character above 128 will be
+displayed incorrectly if written to a terminal set for displaying
+UTF-8 encoded Unicode and v.v. As a common example
+io:format("~s~n",[MyBinaryString]), would need to be informed about
+the fact that the string is encoded in UTF-8 or latin1 to display it
+correctly on a terminal (knowledge about the terminal is also required,
+but that won't change with the representation). 
+The formatting functions actually present a whole set of challenges
+regarding Unicode characters. New formatting controls will be needed
+to inform the formatting functions in the io and io_lib modules that 
+strings are in Unicode or that input is in UTF-8. This is however
+solvable, as discussed below.
+
+My conclusion so far is that as binaries are often used to save space
+and commonly utilized when communicating with external entities, the
+UTF-8 advantages seem to supersede the disadvantages in the
+binary case. It therefore seems sensible to commonly encode Unicode
+characters in binaries as UTF-8. Of course any
+representation is possible, but UTF-8 would be the most common
+case.
+
+Combinations of lists and binaries
+---------------------------------- 
+
+To furthermore complicate things, Erlang has the concept of
+io_lists. An io_list is any (or almost any) combination of integers
+and binaries representing a sequence of bytes, like i.e
+[[85],110,[105,[99]],111,<<100,101>>] as a
+representation of the string "Unicode". When sending data to drivers
+and in many BIFs this rather convenient representation is accepted
+(convenient when constructing, less convenient when traversing).
+
+When dealing with Unicode strings, a similar abstraction would be
+desirable, and with the above suggested conventions, that would mean
+that a Unicode character string could be a list with any combination
+of integers ranging from 0 to 16#10ffff and binaries with Unicode
+characters encoded as UTF-8. Converting such data to a plain list or a
+plain UTF-8 binary would be easily done as long as one knows how the
+characters are encoded to begin with. It would however not necessarily
+be an io_list. Furthermore conversion functions need to be aware of
+the original intention of the list to behave correctly. If one wants
+to convert an io_list containing latin1 characters in both list part
+and binary part to UTF-8, the list part cannot be misinterpreted, as
+latin1 and Unicode are alike for all latin1 characters, but the binary
+part can, as latin1 characters above 127 are encoded in two bytes if
+the binary contains UTF-8 encoded characters, but only one byte when
+latin1 encoding is used. The same of course holds for other encodings,
+if a binary encoded in UTF-32 would be converted to UTF-8, the process
+also would differ from the process of converting latin1 characters.
+
+If we stick with the idea of representing Unicode as one character per
+list element in lists and as UTF-8 in binaries, we could have the
+following definitions:
+
+* A latin1 list: a list containing characters in the range 0..255
+* A latin1 binary: a binary consisting of bytes each representing one
+	           letter in the ISO-8859-1 character set.
+* A Unicode list: a list consisting solely of integers in the range
+                  0..16#10ffff.
+* A Unicode binary: a binary with Unicode characters encoded
+                         as UTF-8
+* A mixed latin1 list: a possibly deep list containing any combination
+                       of integers in the range 0..255 and latin1 binaries.
+* A mixed Unicode list: a possibly deep list containing integers in the
+                        range 0..16#10ffff and Unicode binaries.
+
+Conversion routines
+-------------------
+
+Conversion functions between latin1 lists and latin1 binaries as well
+as from mixed latin1 lists to latin1 binaries are already present in
+the system as list_to_binary, binary_to_list, and iolist_to_binary.
+
+Conversion between Unicode lists, Unicode binaries, and from
+mixed Unicode lists could in a similar way be provided by functions like::
+
+    unicode_list_to_utf8(UM) -> Bin
+
+Where UM is a mixed Unicode list and the result is a UTF-8 binary, and::
+
+    utf8_to_list(Bin) -> UL
+
+Where Bin is a binary consisting of unicode characters encoded as
+UTF-8 and UL is a plain list of unicode characters.
+
+To allow for conversion to and from latin1 the function::
+
+    latin1_list_to_utf8(LM) -> Bin
+
+would suffice, as conversion from UTF-8 to a latin1 list is the same
+operation as conversion to a plain Unicode list (the latin1 list
+representation being interchangeable with the Unicode ditto).
+
+The fact that lists of integers representing latin1 characters are a
+subset of the lists containing Unicode characters might however be more
+confusing than useful to utilize when converting from mixed lists to
+UTF-8 coded binaries. I think a good approach would be to
+differentiate the functions dealing with latin1 characters and Unicode
+so that mixed lists are expected to contain only numbers 0..255 if the
+binaries are expected to contain latin1 bytes. For functions like
+io:format, the same thing should be true i.e. ~s means latin1 mixed
+lists and ~ts means Unicode mixed lists (with binaries in
+UTF-8). Passing a list with an integer > 255 to ~s would be an error
+with this approach, just like passing the same thing to
+latin1_list_to_utf8/1. 
+
+The unicode_list_to_utf8/1 and latin1_list_to_utf8/1 functions can be 
+combined into the single function list_to_utf8/2 like this::
+
+    list_to_utf8(ML,Encoding) -> Bin
+      ML := A mixed Unicode list or a mixed latin1 list
+      Encoding := {latin1 | unicode} 
+
+Giving latin1 as the encoding would mean that all of ML should be
+interpreted as latin1 characters, implying that integers > 255 in the
+list would be an error. Giving unicode as the encoding would mean that
+all integers 0..16#10ffff are accepted and the binaries are expected
+to already be UTF-8 coded.
+
+I think the approach of two simple conversion functions
+utf8_to_list/1 and list_to_utf8/2 is attractive, despite the fact
+that certain combinations of in-data would be somewhat harder to
+convert (e.g. combinations of unicode characters > 255 in a list with
+binaries in latin1). Extending the bit syntax to cope with UTF-8 would
+make it easy to write special conversion functions to cope with those
+rare situations where the above mentioned functions cannot do the job.
+
+Bit syntax
+----------
+
+Using erlang bit syntax on binaries containing Unicode characters
+in UTF-8 could be facilitated by a new type. The type name utf8 would
+be preferable to utf-8, as dashes ("-") have special meaning in bit
+syntax separating type, signedness, endianess and units.
+
+The utf8 type in bit syntax matching would convert a UTF-8
+coded character in the binary to an integer regardless of how many bytes it
+occupies, leaving the trailing part of the binary to be matched against the
+rest of the bit syntax matching expression.
+
+When constructing binaries, an integer converted to UTF-8 could
+consequently occupy between one and four bytes in the resulting binary.
+
+As bit syntax is often used to interpret data from various external sources,
+it would be useful to have a corresponding utf16 type as well. Both
+UTF-8 and UTF-16 is easily interpreted with the current bit syntax
+implementation, but the suggested specific types would be convenient for
+the programmer. UTF-32 need no special bit syntax addition, as every
+character is simply encoded as exactly one 32-bit number. 
+
+Formatting functions
+--------------------
+
+Given a default Unicode character representation in Erlang, let's
+dig deeper into the formatting functions. I suggest the concept of
+formatting control sequence modifiers, an extra character between the
+"~" and the control character, denoting Unicode input/output. The
+letter "t" (for translate) is not used in any formatting functions
+today, making it a good candidate. The meaning of the modifier should
+be such that e.g. the formatting control "~ts" means a string in Unicode
+while "~s" means means a string in latin1.
+
+The definition of io_lib:format must also be changed so that Unicode
+lists might be returned if the "t" modifier is used, which in
+most cases is backward compatible. Going back to the Bulgarian string
+(ex1_), let's look at the following::
+
+    1> UniString = [1050,1072,1082,1074,
+                1086,32,1077,32,85,110,105,99,111,100,101,32,63].
+    2> io_lib:format("~s",[UniString]).
+
+\- here the Unicode string violates the mixed latin1 list property and a
+badarg exception will be raised. This behavior should be retained. On
+the other hand::
+
+    3> io_lib:format("~ts",[UniString]).
+
+\- would return a (deep) Unicode list::
+
+    [[1050,1072,1082,1074,
+      1086,32,1077,32,85,110,105,99,111,100,101,32,63]]
+
+\- which up until now could not happen. This is not a list of bytes,
+but a list of characters. Likewise, the binary containing the UTF-8
+representation of UniString would generate the same list::
+
+    4> UniBin = <<208,154,208,176,208,186,208,178,208,190,32,208,181,32,
+                  85,110,105,99,111,100,101,32,63>>.
+    5> io_lib:format("~ts",[UniBin]).
+    [[1050,1072,1082,1074,
+      1086,32,1077,32,85,110,105,99,111,100,101,32,63]]
+
+\- any other behavior would be confusing and/or incompatible. One
+might be tempted to retain the original binary in the result, but that would
+break the properties of io_lib:format/2 even more, as it currently
+only returns possibly deep list of characters, never binaries.
+
+The Unicode list returned by io_lib:format/2 can then be converted to
+e.g. an UTF-8 binary for writing on a file or processed further in
+other ways. For a discussion of conversion routines, see below.
+
+io:format/3 is a bit more complicated, as it works either directly on an
+external file or on a interactive terminal. As mentioned earlier the
+output device type need to be known (implying an extension to the
+common i/o-protocol in Erlang). Let File represent a generic file
+(disk-file) and Terminal represent an interactive terminal. The
+following call::
+
+    6> io:format(File,"~s",[UniString]).
+
+\- would as before throw the badarg exception, while::
+
+    7> io:format(File,"~ts",[UniString]).
+
+\- would be accepted. However, files are entities containing bytes,
+just like binaries, why the Unicode characters need to be converted to
+UTF-8 when written to the file. This should however not happen when
+the "~s" formatting is used on a file, as in::
+
+    8> io:format(File,"~s",["smörgås"]).
+
+\- where the file is expected to contain latin1 characters after the
+call. This is easily accomplished by converting the output to bytes,
+either in UTF-8 encoding or latin1 before sending the data to the
+file. The programmer knows what file format is wanted at the time of
+program construction, so the right formatting controls can be deduced
+easily.
+
+If, however, we use the same "raw" approach when communicating with a
+terminal, the programmer would need to deduce the right formatting in
+run time. A UTF-8 enabled terminal does not display latin1 correctly
+and v.v. Also a latin1 terminal should print Unicode characters > 255
+as a sequence of readable bytes. Therefore io:format needs to know if
+the output is a terminal, so that it can use another protocol
+(preferably always UTF-8 encoding) and the Erlang terminal driver can
+convert the characters properly for the device, so that::
+
+    9> io:format(Terminal,"~s",["smörgås"]).
+
+\- would convert the string "smörgås" (Swedish word for sandwich)
+to UTF-8 before sending it to the terminal, while::
+
+    10> io:format(Terminal,"~ts",[UniString]).
+
+\- would behave as for files, generating UTF-8 to be handled by the
+terminal driver.
+
+The corresponding behavior of io:fread/2,3 would be to expect UTF-8
+sequences in this call::
+
+    11> io:fread(File,'',"~ts").
+
+\- but expect latin1 in this::
+
+    12> io:fread(File,'',"~s").
+
+If io:fread reads from a terminal device (connected via the Erlang
+terminal driver) however, input should always be expected to be in
+UTF-8 and the only difference between "~s" and "~ts" would be that
+"~s" should not accept UTF-8 sequences that result in character codes
+> 255.
+
+Correspondingly, I suggest that the automatic formatting of list
+sequences as strings by ~p stays limited to latin1
+strings, as a lot of false positives would be generated by guessing if
+a list is a Unicode string.
+
+The "t" modifier to ~p could be used here as well, to heuristically
+format Unicode strings in terms. 
+
+As can be seen when dealing with formatting, a default (expected)
+representation of Unicode in both lists and binaries is essential.
+Imagine the complexity if different encodings (e.g. UTF-16 and UTF-32
+in binaries or UTF-8 in lists) would have to be supported as well.
+
+On a lower level (like bit syntax), support for other encodings like
+UTF-16, would be usable though, as there are a number of protocols
+using UTF-16 and UTF-32 encoding. As an example, Corba IOP encoding accepts
+all three encodings.
+
+Specification
+=============
+
+Convention
+----------
+
+I suggest the convention of letting the Unicode representation in
+lists be one character per element, in binaries UTF-8 and in mixed
+Unicode entities a combination of those.
+
+Conversion to and from latin1 and UTF-8
+---------------------------------------
+
+I also suggest the BIFs utf8_to_list/1 and list_to_utf8/2 as a
+minimal set of functions to deal with the conversion to and from UTF-8
+encoded characters in binaries and mixed Unicode lists::
+
+    list_to_utf8(ML,Encoding) -> Bin
+      ML := Any possibly deep list of integers 0..16#10ffff or binaries.
+      Encoding := {latin1 | unicode} 
+      Bin := Binary containing UTF-8 encoded characters.
+
+    utf8_to_list(Bin) -> UL
+      Bin := Binary containing UTF-8 encoded characters.
+      UL := List of Unicode characters.
+
+Bit syntax
+----------
+
+I suggest an extension to the bit syntax, allowing matching and
+construction in UTF-8 coding, e.g::
+
+    <<Ch/utf8,_/binary>> = BinString
+
+as well as::
+
+    MyBin = <<Ch/utf8,More/binary>>
+
+Optionally UTF-16 could be supported in a similar way for binaries
+(UTF-32 would need no special handling)
+
+Formatting
+----------
+
+I finally suggest the "t" modifier to control sequence in the
+formatting function, which expects mixed lists of integers
+0..16#10ffff and binaries with UTF-8 coded Unicode characters. The
+function io:format should on a terminal cope with displaying
+the characters properly (something the terminal interface and the i/o
+protocol needs to handle eventually).
+
+References
+==========
+
+.. [1] http://www.ietf.org/rfc/rfc3629.txt - The UTF-8 RFC.
+.. [2] http://www.unicode.org/ - The Unicode homepage, containing downloadable versions of the standard(s). 
+
+Copyright
+=========
+
+This document has been placed in the public domain.
+
+..
+   Local Variables:
+   mode: indented-text
+   indent-tabs-mode: nil
+   sentence-end-double-space: t
+   fill-column: 70
+   coding: utf-8
+   End:
+
