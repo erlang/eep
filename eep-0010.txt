@@ -5,6 +5,7 @@ Last-Modified: $Date$
 Author: Patrik Nyblom
 Status: Draft
 Type: Standards Track
+Content-Type: text/x-rst
 Created: 07-05-2008
 Erlang-Version: R12B-4
 Post-History: 01-jan-1970
