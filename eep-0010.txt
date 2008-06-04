@@ -1,6 +1,6 @@
 EEP: 10
 Title: Representing Unicode characters in Erlang
-Version: $Id: unicode_in_erlang.txt,v 1.7 2008/05/14 10:26:20 pan Exp $
+Version: $Id: unicode_in_erlang.txt,v 1.8 2008/06/04 09:17:53 pan Exp $
 Last-Modified: $Date$
 Author: Patrik Nyblom
 Status: Draft
@@ -297,17 +297,25 @@ implementation, but the suggested specific types would be convenient for
 the programmer. UTF-32 need no special bit syntax addition, as every
 character is simply encoded as exactly one 32-bit number. 
 
+The utf16 type need to have an endianess option, as UTF-16 can be stored in
+big or little endian entities.
+
 Formatting functions
 --------------------
 
-Given a default Unicode character representation in Erlang, let's
-dig deeper into the formatting functions. I suggest the concept of
+Given a default Unicode character representation in Erlang, let's dig
+deeper into the formatting functions. I suggest the concept of
 formatting control sequence modifiers, an extra character between the
 "~" and the control character, denoting Unicode input/output. The
 letter "t" (for translate) is not used in any formatting functions
 today, making it a good candidate. The meaning of the modifier should
-be such that e.g. the formatting control "~ts" means a string in Unicode
-while "~s" means means a string in latin1.
+be such that e.g. the formatting control "~ts" means a string in
+Unicode while "~s" means means a string in latin1. The reason for not
+simply introducing a new single control character, is that the
+suggested modifier can be applicable to various control characters,
+like e.g. "p" or even "w", while a new single control character for
+unicode strings would only be a replacement for the current "s"
+control character.
 
 The definition of io_lib:format must also be changed so that Unicode
 lists might be returned if the "t" modifier is used, which in
@@ -465,8 +473,12 @@ as well as::
 
     MyBin = <<Ch/utf8,More/binary>>
 
-Optionally UTF-16 could be supported in a similar way for binaries
-(UTF-32 would need no special handling)
+Optionally UTF-16 could be supported in a similar way for binaries, e.g::
+
+    <<Ch/utf16-little,_/binary>> = BinString
+
+UTF-32 support will not require a new type as the fixed width of UTF-32 makes
+current bit syntax sufficient.
 
 Formatting
 ----------
