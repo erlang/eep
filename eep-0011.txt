@@ -1,0 +1,569 @@
+EEP: 11
+Title: Built in regular expressions in Erlang
+Version: $Id: re_in_erlang.txt,v 1.9 2008/06/11 13:56:34 pan Exp $
+Last-Modified: $Date$
+Author: Patrik Nyblom
+Status: Draft
+Type: Standards Track
+Content-Type: text/x-rst
+Created: 04-06-2008
+Erlang-Version: R12B-4
+Post-History: 01-Jan-1970
+
+Abstract
+========
+
+This EEP suggests how to integrate an external regular expression
+library into the Erlang virtual machine.
+
+Motivation
+==========
+
+Regular expressions are widely used. Regardless of how other features
+of a language can be used to match or pick out parts of a string, many
+programmers prefer the regular expression syntax and expect
+regular expressions to be available in a modern language.
+
+The Perl programming language has integrated regular expressions
+directly into the syntax and Perl programmers are often highly skilled
+at writing complicated regular expressions that parse e.g. text files,
+HTTP requests or simple user input. The Perl extensions to the common
+regular expressions are widely known and many modern programming
+languages support something similar.
+
+Erlang currently has a minimalistic regular expression module (regexp
+module in STDLIB), which lacks features commonly available in other
+implementations. The current library is also painfully slow compared
+to the native C libraries utilized in other languages.
+
+Erlang needs to interface with a modern regular expression library in
+a way that does not break the properties of the virtual machine.
+
+Rationale
+=========
+
+Preconditions
+-------------
+
+Writing a more efficient regular expression library purely in Erlang
+has been attempted, but so far no really efficient implementation has
+been proposed, and the work involved in creating one is deemed
+extensive.
+
+On the other hand, several more or less successful attempts to
+integrate an external regular expressions library into the virtual
+machine have been presented. None of them, however, have addressed the
+issue of long running regular expressions stalling the schedulers.
+
+A built in function in the Erlang VM needs to stop execution when it
+has run a certain amount of iterations, to avoid stalling a scheduler
+and thereby starving other processes in the system. When the Erlang
+process get's scheduled again, the built in function restarts and has
+provided some way of storing it's current state so that execution of
+the function can continue where it was once left. 
+
+The execution of a regular expression match is in many ways similar to the
+virtual machine's execution of ordinary beam code, but the available
+libraries are (for obvious reasons) not prepared to give up the
+execution temporarily to allow other processes to execute. A
+complicated regular expression on large amounts of subject data can
+take seconds or even minutes to execute. Stalling one of the
+schedulers in the VM for that amount of time is not an option in a
+real parallel system. As suggested interfaces to external libraries
+have never addressed this problem, none have been accepted and/or
+integrated in the main Erlang distribution.
+
+Stack usage is another issue seldom addressed. The Erlang virtual
+machine may run a lot of scheduler threads, especially on processors
+with large amounts of cores. Multithreading applications need to be
+careful about stack usage, why recursive C routines are best
+avoided. The Erlang virtual machine avoids recursion in C code, why a
+linked in library should do the same. When it comes to realtime
+operating systems, the need to avoid recursion in the C code is even
+more obvious. The library used for Erlang regular expressions simply
+cannot be recursive on the C stack, at least not in a way where stack
+usage cannot be determined at compile time.
+
+Multithreading versus interruptable execution
+:::::::::::::::::::::::::::::::::::::::::::::
+
+The problem of interrupting the execution of a regular expression (or
+other lengthy operations) when another Erlang process should be
+scheduled, has two obvious solutions:
+
+1. Count the number of iterations in a regular expression match, store
+   the state after a certain amount of iterations (or a certain amount
+   of time) and return control to the scheduler when execution time
+   slot is exceeded.  
+
+2. Let the operating system take care of the problem by executing the
+   regular expression matches in separate kernel threads.
+
+In the virtual machine's file driver, the second approach is used,
+introducing the concept of the asynchronous thread pool. The file I/O
+case is however special as the I/O operation in itself usually
+consumes far more time than the running time for the inter-thread
+communication and task switching involved when using asynchronous
+threads. Besides, there simply is no other solution at hand for I/O,
+so OS threads is the *only* solution at hand in that case.
+
+If regular expressions were to be executed in separate threads, even
+very small and simple expressions would have to carry the extra burden
+of OS level task switching and communication.
+
+Other lengthy operations in the virtual machine use the first
+approach of voluntary interruption and rescheduling. In the cases
+where external libraries are involved, like IP communication, the
+emulator provides ways to passively wait for events by supplying
+interfaces to I/O multiplexing (select/poll). This is the way to avoid
+blocking the schedulers in most drivers. Asynchronous threads are only
+utilized where there simply are no other options, like in file I/O
+(which cannot utilize I/O multiplexing).
+
+Using the first solution when interfacing an external library in a
+driver or BIF, involves either finding a library where interruption and
+restart of execution is possible, or modifying an existing library to
+support this.
+
+Even though modifying a library will make upgrading and patching of
+the library much harder, the benefits are significant. When executing e.g.
+regular expressions, the same thread that actually is executing the
+beam code will be utilized, why setup time and overhead in general is
+kept at a minimum. Of course execution time of the regexp itself will
+be slightly longer, as the implementation needs to keep track of the
+number of executed iterations and needs to be prepared to store the
+current state for later execution wakeup. The much smaller setup time
+is however expected to be dominating when it comes to smaller regular
+expressions (or rather expressions that involve a small number of
+loops). One also has to bear in mind that this solution imposes much
+less load on the operating system scheduler, which is a good thing for
+large and/or embedded systems.
+
+For operating systems where no kernel threads are available, the first
+solution is the only acceptable. Separate threads for pure user space
+code execution will do more harm than good to the realtime properties
+of the Erlang system.
+
+Selecting a suitable library to integrate
+:::::::::::::::::::::::::::::::::::::::::
+
+The library to integrate into the virtual machine should in an ideal
+situation fulfill the following wishes:
+
+- Interruptable, the execution of the regular expression match should
+  stop after a certain amount of iterations and should then be
+  restartable at a later time.
+- The library should be implemented in plain C, not any other language
+  or extension.
+- The C implementation should be non-recursive.
+- The library should implement modern (Perl like) regular expression 
+  syntax.
+- The library should be efficient.
+- The library should provide Unicode support.
+
+No available regular expression library currently provides a perfect
+match. The best available is the PCRE [1]_ library, which has compile time
+options for not using the C stack, Perl (and Python) compatible
+regular expressions and also is written in a well structured way,
+making it suitable for integration, porting and implementing
+extensions needed in the Erlang case.
+
+Other alternatives include rxlib (no longer maintained), the Tcl/Tk
+regular expression implementation, GNU regex, Jakarta and Onigurama,
+among others. Of those the Tcl/Tk implementation seems the most
+promising, especially as it for many situations is much faster than
+other implementations. The algorithms and code are however quite
+incomprehensible and the regular expression flavor not the most
+widespread.
+
+After having had a good look at the alternatives, I came to the
+conclusion that PCRE was the best choice for the following reasons:
+
+- The code is maintained, very readable and easy to work with.
+- The library is fast, although not the fastest.
+- Extensive test suites.
+- Perl compatible syntax.
+- Widely spread: Used in Apache, PHP, Apple Safari etc.
+- The regexp engine is pure C.
+- Unicode support (UTF-8) which fits nicely into the suggested
+  Unicode representation in Erlang (EEP 10).
+- Recursion on the C stack can be avoided.
+- The library has most of the infrastructure for an interruptable
+  execution of the expressions present, although restarting of
+  interrupted matches is not (yet) implemented.
+
+Although the subjective reasoning about code readability might seem
+somewhat out of place, the PCRE code base makes updates to the library
+easier to integrate, as relatively few and comprehensible alterations
+need to be done to the library to make it fit into the virtual
+machine. To be able to maintain the library is important and being
+able to understand the code is crucial.
+
+The most appealing feature of the library is however the extensive
+support for Perl compatible regular expressions. PCRE is certainly one
+of the most powerful libraries around and Erlang programmers used to
+Perl's regular expressions will feel at home.
+
+Programmers interface
+---------------------
+
+In Perl, the regular expressions are integrated into the language
+itself. This could of course be done in Erlang too. However, Erlang
+already has syntax for matching structured data as well as binary
+ditto. Introducing new primitives for string matching with regular
+expressions seems out of place. Erlang is also not a language designed
+for processing textual data in the way Perl is, but a language that
+can handle complicated structured data. The bit-syntax however might
+one day benefit from regular expression extensions, but that is beyond
+the scope of this EEP.
+
+A regular expression module interfacing with the library through built
+in functions is the usual way to do it in Erlang, and that's the way
+this EEP suggests. As the module name regexp is already taken, the
+abbreviation "re" for module name seems to be a good choice.
+
+As a base implementation, I suggest a module with two basic functions:
+one for precompiling a regular expression into "bytecode" for the
+regular expression matching execution; and one for actually running
+the regexp matching. The function that runs the matching should take
+either a compiled regular expression, or the source of a regular
+expression as input (together with the subject string and the options
+for execution). 
+
+Around these two suggested functions one can implement functionality
+in Erlang to mimic the existing regular expression library or
+implement new functionality. The names of the functions should be
+chosen so that mixup with the current regexp library functions is
+avoided, why I suggest "compile" and "run" as names for the respective
+functions. Here follows part of the suggested manual page:
+
+Excerpt from a suggested manual page
+::::::::::::::::::::::::::::::::::::
+
+DATA TYPES
+..........
+
+- iodata() = iolist() | binary()
+- iolist() = [char() | binary() | iolist()]
+  
+  * a binary is allowed as the tail of the list
+
+- mp() = Opaque datatype containing a compiled regular expression.
+
+EXPORTS
+.......
+
+**compile(Regexp) -> {** ``ok`` **, MP} | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Regexp = iodata()
+
+The same as compile(Regexp,[]).
+
+**compile(Regexp,Options) -> {** ``ok`` **, MP} | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Regexp = iodata()
+- Options = [ Option ]
+- Option = ``anchored`` | ``caseless`` | ``dollar_endonly`` | ``dotall`` | ``extended`` | ``firstline`` | ``multiline`` | ``no_auto_capture`` | ``dupnames`` | ``ungreedy`` | { ``newline`` , NLSpec}
+- NLSpec = ``cr`` | ``crlf`` | ``lf`` | ``anycrlf``
+- MP = mp()
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+This function compiles a regular expression with the syntax described below into an internal format to be used later as a parameter to the run/2,3 functions.
+
+Compiling the regular expression before matching is useful if the same expression is to be used in matching against multiple subjects during the program's lifetime. Compiling once and executing many times is far more efficient than compiling each time one wants to match.
+
+The options have the following meanings:
+
+``anchored``
+    The pattern is forced to be "anchored", that is, it is constrained to match only at the first matching point in the string that is being searched (the "subject string"). This effect can also be achieved by appropriate constructs in the pattern itself. 
+``caseless``
+    Letters in the pattern match both upper and lower case letters. It is equivalent to Perl's /i option, and it can be changed within a pattern by a (?i) option setting. Uppercase and lowercase letters are defined as in the ISO-8859-1 character set. 
+``dollar_endonly``
+    A dollar metacharacter in the pattern matches only at the end of the subject string. Without this option, a dollar also matches immediately before a newline at the end of the string (but not before any other newlines). The dollar_endonly option is ignored if multiline is given. There is no equivalent option in Perl, and no way to set it within a pattern. 
+``dotall``
+    A dot maturate in the pattern matches all characters, including those that indicate newline. Without it, a dot does not match when the current position is at a newline. This option is equivalent to Perl's /s option, and it can be changed within a pattern by a (?s) option setting. A negative class such as [^a] always matches newline characters, independent of the setting of this option. 
+``extended``
+    Whitespace data characters in the pattern are ignored except when escaped or inside a character class. Whitespace does not include the VT character (ASCII 11). In addition, characters between an unescaped # outside a character class and the next newline, inclusive, are also ignored. This is equivalent to Perl's /x option, and it can be changed within a pattern by a (?x) option setting. This option makes it possible to include comments inside complicated patterns. Note, however, that this applies only to data characters. Whitespace characters may never appear within special character sequences in a pattern, for example within the sequence (?( which introduces a conditional subpattern. 
+``firstline``
+    An unanchored pattern is required to match before or at the first newline in the subject string, though the matched text may continue over the newline. 
+``multiline``
+    By default, PCRE treats the subject string as consisting of a single line of characters (even if it actually contains newlines). The "start of line" metacharacter (^) matches only at the start of the string, while the "end of line" metacharacter ($) matches only at the end of the string, or before a terminating newline (unless dollar_endonly is given). This is the same as Perl.
+    When multiline it is given, the "start of line" and "end of line" constructs match immediately following or immediately before internal newlines in the subject string, respectively, as well as at the very start and end. This is equivalent to Perl's /m option, and it can be changed within a pattern by a (?m) option setting. If there are no newlines in a subject string, or no occurrences of ^ or $ in a pattern, setting multiline has no effect.
+``no_auto_capture``
+    Disables the use of numbered capturing parentheses in the pattern. Any opening parenthesis that is not followed by ? behaves as if it were followed by ?: but named parentheses can still be used for capturing (and they acquire numbers in the usual way). There is no equivalent of this option in Perl. 
+``dupnames``
+    Names used to identify capturing subpatterns need not be unique. This can be helpful for certain types of pattern when it is known that only one instance of the named subpattern can ever be matched. There are more details of named subpatterns below 
+``ungreedy``
+    This option inverts the "greediness" of the quantifiers so that they are not greedy by default, but become greedy if followed by "?". It is not compatible with Perl. It can also be set by a (?U) option setting within the pattern. 
+{ ``newline`` , NLSpec}
+    Override the default definition of a newline in the subject string, which is LF (ASCII 10) in Erlang.
+
+    ``cr``
+        Newline is indicated by a single character CR (ASCII 13). 
+    ``lf``
+        Newline is indicated by a single character LF (ASCII 10), the default. 
+    ``crlf``
+        Newline is indicated by the two-character CRLF (ASCII 13 followed by ASCII 10) sequence. 
+    ``anycrlf``
+        Any of the three preceding sequences should be recognized. 
+
+**run(Subject,RE) -> {** ``match`` **, Captured} |** ``nomatch`` **| {** ``error`` **, ErrSpec}**
+
+Types:
+
+- RE = mp() | iodata()
+- Subject = iodata()
+- Captured = [ CaptureData ]
+- CaptureData = {int(),int()} | string() | binary()
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+The same as run(RE,Subject,[]).
+
+**run(Subject,RE,Options) -> ``match`` | {** ``match`` **, Captured} |** ``nomatch`` **| {** ``error`` **, ErrSpec}**
+
+Types:
+
+- RE = mp() | iodata()
+- Subject = iodata()
+- Options = [ Option ]
+- Option = ``anchored`` | ``notbol`` | ``noteol`` | ``notempty`` | { ``offset`` , int()} | { ``newline`` , NLSpec} | { ``capture`` , ValueSpec} | { ``capture``, ValueSpec, Type} | CompileOpt
+- Type = ``index`` | ``list`` | ``binary``
+- ValueSpec = ``all`` | ``all_but_first`` | ``first`` | ValueList
+- ValueList = [ ValueID ]
+- ValueID = int() | string() | atom()
+- CompileOpt = see compile/2 above
+- NLSpec = ``cr`` | ``crlf`` | ``lf`` | ``anycrlf``
+- Captured = [ CaptureData ]
+- CaptureData = {int(),int()} | string() | binary()
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+Executes a regexp matching, returning {match, Captured} or nomatch. The regular expression can be given either as iodata() in which case it is automatically compiled (as by re:compile/2) and executed, or as a pre compiled mp() in which case it is executed against the subject directly.
+
+When compilation is involved, the function may return compilation errors as when compiling separately ({ ``error`` , {string(),int()}}); when only matching, no errors are returned.
+
+The option list can only contain the options ``anchored``, ``notbol``, ``noteol``, ``notempty``, { ``offset`` , int()}, { ``newline`` , NLSpec} and { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type} if the regular expression is previously compiled, otherwise all options valid for the re:compile/2 function are allowed as well. Options allowed both for compilation and execution of a match, namely ``anchored`` and { ``newline`` , NLSpec}, will affect both the compilation and execution if present together with a non pre-compiled regular expression.
+
+The { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type} defines what to return from the function upon successful matching. The capture tuple may contain both a value specification telling which of the captured substrings are to be returned, and a type specification, telling how captured substrings are to be returned (as index tuples, lists or binaries). The capture option makes the function quite flexible and powerful. The different options are described in detail below.
+
+If the capture options describe that no substring capturing at all is to be done ({ ``capture`` , ``none`` }), the function will return the single atom match upon successful matching, otherwise the tuple { ``match`` , ValueList} is returned. Disabling capturing can be done either by specifying none or an empty list as ValueSpec.
+
+A description of all the options relevant for execution follows:
+
+``anchored``
+    Limits re:run/3 to matching at the first matching position. If a pattern was compiled with anchored, or turned out to be anchored by virtue of its contents, it cannot be made unachored at matching time, hence there is no unanchored option. 
+``notempty``
+    An empty string is not considered to be a valid match if this option is given. If there are alternatives in the pattern, they are tried. If all the alternatives match the empty string, the entire match fails. For example, if the pattern::
+
+        a?b?
+
+    is applied to a string not beginning with "a" or "b", it matches the empty string at the start of the subject. With notempty given, this match is not valid, so re:run/3 searches further into the string for occurrences of "a" or "b".
+    Perl has no direct equivalent of notempty, but it does make a special case of a pattern match of the empty string within its split() function, and when using the /g modifier. It is possible to emulate Perl's behavior after matching a null string by first trying the match again at the same offset with notempty and anchored, and then if that fails by advancing the starting offset (see below) and trying an ordinary match again.
+``notbol``
+    This option specifies that the first character of the subject string is not the beginning of a line, so the circumflex metacharacter should not match before it. Setting this without multiline (at compile time) causes circumflex never to match. This option affects only the behavior of the circumflex metacharacter. It does not affect \A. 
+``noteol``
+    This option specifies that the end of the subject string is not the end of a line, so the dollar metacharacter should not match it nor (except in multiline mode) a newline immediately before it. Setting this without multiline (at compile time) causes dollar never to match. This option affects only the behavior of the dollar metacharacter. It does not affect \Z or \z. 
+{ ``offset`` , int()}
+    Start matching at the offset (position) given in the subject string. The offset is zero-based, so that the default is {offset,0} (all of the subject string). 
+{ ``newline`` , NLSpec}
+    Override the default definition of a newline in the subject string, which is LF (ASCII 10) in Erlang.
+
+    ``cr``
+        Newline is indicated by a single character CR (ASCII 13) 
+    ``lf``
+        Newline is indicated by a single character LF (ASCII 10), the default 
+    ``crlf``
+        Newline is indicated by the two-character CRLF (ASCII 13 followed by ASCII 10) sequence. 
+    ``anycrlf``
+        Any of the three preceding sequences should be recognized. 
+
+{ ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type}
+    Specifies which captured substrings are returned and in what format. By default, re:run/3 captures all of the matching part of the substring as well as all capturing subpatterns (all of the pattern is automatically captured). The default return type is (zero-based) indexes of the captured parts of the string, given as {Offset,Length} pairs (the index Type of capturing).
+    As an example of the default behavior, the following call::
+
+        re:run("ABCabcdABC","abcd",[]).
+
+    returns, as first and only captured string the matching part of the subject ("abcd" in the middle) as a index pair {3,4}, where character positions are zero based, just as in offsets. The return value of the call above would then be::
+
+        {match,[{3,4}]}
+
+    Another (and quite common) case is where the regular expression matches all of the subject, as in::
+
+        re:run("ABCabcdABC",".*abcd.*",[]).
+
+    where the return value correspondingly will point out all of the string, beginning at index 0 and being 10 characters long::
+
+        {match,[{0,10}]}
+
+    If the regular expression contains capturing subpatterns, like in the following case::
+
+        re:run("ABCabcdABC",".*(abcd).*",[]).
+
+    all of the matched subject is captured, as well as the captured substrings::
+
+        {match,[{0,10},{3,4}]}
+
+    the complete matching pattern always giving the first return value in the list and the rest of the subpatterns being added in the order they occurred in the regular expression.
+    The capture tuple is built up as follows:
+
+    ValueSpec
+        Specifies which captured (sub)patterns are to be returned. The ValueSpec can either be an atom describing a predefined set of return values, or a list containing either the indexes or the names of specific subpatterns to return.
+        The predefined sets of subpatterns are:
+
+        ``all``
+            All captured subpatterns including the complete matching string. This is the default. 
+        ``first``
+            Only the first captured subpattern, which is always the complete matching part of the subject. All explicitly captured subpatterns are discarded. 
+        ``all_but_first``
+            All but the first matching subpattern, i.e. all explicitly captured subpatterns, but not the complete matching part of the subject string. This is useful if the regular expression as a whole matches a large part of the subject, but the part you're interested in is in an explicitly captured subpattern. If the return type is list or binary, not returning subpatterns you're not interested in is a good way to optimize. 
+        ``none``
+            Do not return matching subpatterns at all, yielding the single atom match as the return value of the function when matching successfully instead of the {match, list()} return. Specifying an empty list gives the same behavior. 
+
+        The value list is a list of indexes for the subpatterns to return, where index 0 is for all of the pattern, and 1 is for the first explicit capturing subpattern in the regular expression, and so forth. When using named captured subpatterns (see below) in the regular expression, one can use atom()'s or string()'s to specify the subpatterns to be returned. This deserves an example, consider the following regular expression::
+
+            ".*(abcd).*"
+
+        matched against the string ""ABCabcdABC", capturing only the "abcd" part (the first explicit subpattern)::
+
+            re:run("ABCabcdABC",".*(abcd).*",[{capture,[1]}]).
+
+        The call will yield the following result::
+
+            {match,[{3,4}]}
+
+        as the first explicitly captured subpattern is "(abcd)", matching "abcd" in the subject, at (zero-based) position 3, of length 4.
+        Now consider the same regular expression, but with the subpattern explicitly named 'FOO'::
+
+            ".*(?<FOO>abcd).*"
+
+        With this expression, we could still give the index of the subpattern with the following call::
+
+            re:run("ABCabcdABC",".*(?<FOO>abcd).*",[{capture,[1]}]).
+
+        giving the same result as before. But as the subpattern is named, we can also give its name in the value list::
+
+            re:run("ABCabcdABC",".*(?<FOO>abcd).*",[{capture,['FOO']}]).
+
+        which would yield the same result as the earlier examples, namely::
+
+            {match,[{3,4}]}
+
+        The values list might specify indexes or names not present in the regular expression, in which case the return values vary depending on the type. If the type is index, the tuple {-1,0} is returned for values having no corresponding subpattern in the regexp, but for the other types (binary and list), the values are the empty binary or list respectively. This makes it impossible to differentiate between a empty matching subpattern and an invalid subpattern name in the return values for those types. If that differentiation is necessary, use the type index and do the conversion to the final type in Erlang code.
+
+    In general, subpatterns that got assigned no value in the match are returned as the tuple {-1,0} when type is index. Unasigned subpatterns are returned as the empty binary or list respectively for other return types. Consider the regular expression::
+
+        ".*((?<FOO>abdd)|a(..d)).*"
+
+    There are three explicitly capturing subpatterns, where the opening parenthesis position determines the order in the result, hence ((?<FOO>abdd)|a(..d)) is subpattern index 1, (?<FOO>abdd) is subpattern index 2 and (..d) is subpattern index 3. When matched against the following string::
+
+        "ABCabcdABC"
+
+    the subpattern at index 2 won't match, as "abdd" is not present in the string, but the complete pattern matches (due to the alternative a(..d). The subpattern at index 2 is therefore unassigned and the default return value will be::
+
+        {match,[{0,10},{3,4},{-1,0},{4,3}]}
+
+    Setting the capture Type to binary would give the following::
+
+        {match,[<<"ABCabcdABC">>,<<"abcd">>,<<>>,<<"bcd">>]}
+
+    where the empty binary (<<>>) represents the unassigned subpattern. In the binary case, some information about the matching is therefore lost, the <<>> might just as well be an empty string captured.
+
+    Type
+        Optionally specifies how captured substrings are to be returned. If omitted, the default of index is used. The Type can be one of the following:
+
+        ``index``
+            Return captured substrings as pairs of byte indexes into the subject string and length of the matching string in the subject (as if the subject string was flattened with i.e. iolist_to_binary prior to matching). This is the default. 
+        ``list``
+            Return matching substrings as lists of characters (Erlang string()'s). 
+        ``binary``
+            Return matching substrings as binaries. 
+
+The options solely affecting the compilation step are described in the re:compile/2 function.
+
+Supported string representations
+::::::::::::::::::::::::::::::::
+
+As can be viewed in the manual excerpt, I suggest allowing both the
+regular expressions and the subject strings to be provided as
+*iodata()*, which means either binaries, lists or a mix of binaries
+and deep lists. When Unicode is not involved, this basically means a
+implicit *iolist_to_binary()* when supplying data to the re module.
+
+Further extensions
+::::::::::::::::::
+
+The following extensions are not yet implemented in the prototype, but
+should be included in a final release:
+
+- Unicode support, a "unicode" option to the compilation and automatic
+  handling of (possibly mixed) Unicode strings represented as
+  suggested in EEP 10.
+
+- Match predicates to make it easy to use regular expressions in
+  logical Erlang expressions.
+
+- String substitution functionality.
+
+- Mimicking of interface functions in the old regexp library,
+  either with the same function names (which however might encourage
+  mix up of the modules) or with new names.
+
+Of these, Unicode support is the far most important, and also the one
+that can not be implemented efficiently purely in Erlang code.
+
+Prototype implementation
+------------------------
+
+A prototype implementation using the PCRE library is present along
+with a reference manual page in the R12B-3 distribution. This
+implementation does not yet fully support Unicode, as EEP 10 is not
+accepted at the time of writing.
+
+In terms of performance, fairly simple regular expressions matches are
+with this prototype up to 75 times faster than with the current regexp
+module. The bookkeeping to allow for interruptions of the regular
+expression execution costs between 1 and 2% of the performance when no
+out scheduling is needed. In worst cases a 5% performance loss can be
+noted compared to an untouched library, but then actual restarting is
+involved, so the numbers are not fully comparable.
+
+Compiling PCRE to use the C stack for recursive calls and avoid
+restarting is expected to give the best results in terms of execution
+speed. The difference in benchmarks to the fully interruptable version
+is however only in the range of 1 to 3% when no restarting occurs and
+still no more than 6% when restarting actually occurs.
+
+The conclusion is that the extra cost imposed on the PCRE library to
+allow an integration into the Erlang emulator without using
+asynchronous threads is in an absolute worst scenario no more than 6%
+compared to a theoretical maximum.
+
+References
+==========
+
+.. [1] http://www.pcre.org/ - The PCRE homepage.
+
+Copyright
+=========
+
+This document has been placed in the public domain.
+
+..
+   Local Variables:
+   mode: indented-text
+   indent-tabs-mode: nil
+   sentence-end-double-space: t
+   fill-column: 70
+   coding: utf-8
+   End:
+
+

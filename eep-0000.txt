@@ -33,6 +33,8 @@ Numerical Index
  S     8  Types and function specifications              Kostis Sagonas
  S     9  Library for working with binaries              Fredrik Svahn
  S    10  Representing Unicode characters in Erlang      Patrik Nyblom
+ S    11  Built in regular expressions in Erlang         Patrik Nyblom
+
 
 Key
 
