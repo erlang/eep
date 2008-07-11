@@ -2,7 +2,7 @@ EEP: 1
 Title: EEP Purpose and Guidelines
 Version: $Revision$
 Last-Modified: $Date$
-Author: Per Gustafsson <pergu@it.uu.se>
+Author: Per Gustafsson [pergu(at)it(dot)uu(dot)se]
 Status: Draft
 Type: Process
 Content-Type: text/x-rst

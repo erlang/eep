@@ -2,7 +2,7 @@ EEP: 13
 Title: -enum declarations
 Version: $Revision$
 Last-Modified: $Date$
-Author: Richard A. O'Keefe <ok (at) cs (dot) otago (dot) ac (dot) nz>
+Author: Richard A. O'Keefe [ok(at)cs(dot)otago(dot)ac(dot)nz]
 Status: Draft
 Type: Standards Track
 Erlang-Version: R12B-4

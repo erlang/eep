@@ -2,7 +2,7 @@ EEP: 8
 Title: Types and function specifications
 Version: $Revision$
 Last-Modified: $Date$
-Author: Tobias Lindahl <tobias(dot)lindahl(at)it(dot)uu(dot)se>, Kostis Sagonas <kostis(at)it(dot)uu(dot)se>
+Author: Tobias Lindahl [tobias(dot)lindahl(at)it(dot)uu(dot)se], Kostis Sagonas [kostis(at)it(dot)uu(dot)se]
 Status: Draft
 Type: Standards Track
 Content-Type: text/x-rst

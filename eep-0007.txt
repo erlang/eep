@@ -2,7 +2,7 @@ EEP: 7
 Title: Foreign Function Interface (FFI)
 Version: $Revision$
 Last-Modified: $Date$
-Author: Alceste Scalas <alceste (at) crs4 (dot) it>
+Author: Alceste Scalas [alceste(at)crs4(dot)it]
 Status: Draft
 Type: Standards Track
 Content-Type: text/x-rst

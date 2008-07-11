@@ -2,7 +2,7 @@ EEP: 2
 Title: Sample Plaintext PEP Template
 Version: $Revision$
 Last-Modified: $Date$
-Author: Per Gustafsson <pergu@it.uu.se>
+Author: Per Gustafsson [pergu(at)it(dot)uu(dot)se]
 Status: Active
 Type: Process
 Content-Type: text/plain

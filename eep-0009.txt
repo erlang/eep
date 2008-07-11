@@ -2,7 +2,7 @@ EEP:            9
 Title:          Library for working with binaries
 Version:        $Revision$
 Last-Modified:  $Date$
-Author:         Fredrik Svahn <Fredrik dot Svahn at gmail>
+Author:         Fredrik Svahn [Fredrik(dot)Svahn(at)gmail]
 Status:         Draft
 Type:           Standards Track
 Content-Type:   text/plain
