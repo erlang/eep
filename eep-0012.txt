@@ -1,0 +1,220 @@
+EEP: 12
+Title: Extensions to comprehensions
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok (at) cs (dot) otago (dot) ac (dot) nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 10-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Add tuple-valued comprehensions to go with list and binary
+    comprehensions.
+
+    Add tuple generators to go with list and binary generators.
+
+    Fix a syntax botch in comprehension qualifiers by explicitly
+    recognising pattern = value bindings and treating them in a
+    way that makes sense.
+
+Specification
+
+    Currently, Erlang has
+
+        '['  Expr '||' Generators-And-Tests ']'
+        '<<' Expr '||' Generators-And-Tests '>>'
+
+    for generating lists and binaries, but there is no corresponding
+    form for generating tuples.  We add
+
+        '{' Expr '||' Generators-And-Tests '}'
+
+    with the meaning that { E || G } has the same behaviour as
+    erlang:list_to_tuple([E || G]} except that it need not call
+    erlang:list_to_tuple/1.
+
+    Currently, Erlang comprehensions allow
+
+        Pattern '<-' Expr
+
+    to enumerate over list and
+
+        Pattern '<=' Expr
+
+    to enumerate over binaries.  The second of these forms is,
+    I must say, not just asking for trouble, but screaming for it.
+    This proposal adds three new forms:
+
+        Pattern '['  '<-' ']'  Expr
+        Pattern '{'  '<-' '}'  Expr
+        Pattern '<<' '<-' '>>' Expr
+
+    for enumerating over lists, tuples, and binaries respectively,
+    providing an iconic representation of what Expr should be.
+    [<-] and << <- >> have exactly the same semantics as the
+    existing <- and <= do.  The semantics of Pattern {<=} Expr
+    is that of Pattern <- erlang:tuple_to_list(Expr), except that
+    erlang:tuple_to_list/1 need not be called.
+
+    Currently the Generators-And-Tests part allows a sequence of
+    generators and tests, where a test is any expression.  A test
+    must evaluate to either 'false' or 'true'.  The form
+        Pattern = Expr
+    is syntactically an expression, so is allowed as a test.
+    However, in context, this makes no sense.  For a given Expr,
+    there are four possible outcomes:
+    a. Expr raises an exception => an exception is raised.
+    b. Expr does not yield false or true => an exception is raised.
+    c. Expr yields false => the test fails;
+       this might as well have been Expr without Pattern.
+    d. Expr yields true => the test succeeds;
+       this might as well have been Expr without Pattern,
+       and Pattern = true beforehand.
+======================================================================
+    This proposal changes part of the description of comprehensions to
+        each Qualifier is either a generator, a binder, or a filter.
+
+        A generator is a list generator, a tuple generator,
+        or a bit string generator.
+        A list generator is written as
+            Pattern <- List_Expr
+        or as
+            Pattern [<-] List_Expr
+        where List_Expr is an expression which must evaluate to
+        a list of terms.
+        A tuple generator is written as
+            Pattern {<-} Tuple_Expr
+        where Tuple_Expr is an expression which must evaluate to
+        a tuple of terms.
+        A bit string generator is written as
+            Bit_String_Pattern <= Bit_String_Expr
+        or as
+            Bit_String_Pattern << <- >> Bit_String_Expr
+        where Bit_String_Expr is an expression which must
+        evaluate to a bit string.
+        The variables in the generator patterns shadow variables in the
+        function clause surrounding the comprehension.  These variables
+        are not visible outside the comprehension.
+
+        A binder has the form
+            Pattern = Expr
+        or
+            Pattern = Binder
+        This evaluates the Expr and matches the result against the
+        Pattern, binding variables in it.
+        The variables in the binder patterns shadow variables in the
+        function clause surrounding the comprehension.  These variables
+        are not visible outside the comprehension.
+        
+        A filter is an expression which evaluates to 'true' or 'false'.
+        They are not limited to being guard tests.
+
+
+
+Motivation
+
+    Using Clean as well as Erlang, the lack of tuple comprehensions
+    and tuple generators is an irritation.  It is possible to get the
+    desired effect in the existing language, but especially since
+    bit string comprehensions were added to the language, the
+    omission seems utterly pointless.  The new forms are easier to
+    think of and easier to read than forms that go through list
+    comprehensions.
+
+    Haskell list comprehensions allow generators, filters, and
+    'let' bindings.  The lack of let bindings in Erlang list
+    comprehensions is difficult to understand; the fact that what
+    LOOKS like Erlang's equivalent of let bindings is allowed but
+    misbehaves at run time is difficult to forgive.
+
+
+
+
+Rationale
+
+    The syntax for tuple comprehensions is obvious; no other syntax
+    would be tolerable.
+
+    The syntax for tuple generators has a certain gawky charm;
+    perhaps only a mother could love it.  I tried <-[] <-{} <-<<>>
+    but had trouble getting Yecc to like those.  If it can be
+    squeezed past Yecc's limited lookahead somehow, the forms with
+    the arrow outside the brackets would be prettier.  Contrast
+        { X+1 || X {<-} Xs }
+        { X+1 || X <-{} Xs }
+
+    The way Erlang currently allows Pattern = Expr in comprehension
+    qualifiers but gives it a completely useless meaning is a syntax
+    bug that needs urgent correction.  One approach is to recognise
+    attempts to use the form and report them as syntax errors; to me
+    it seems better to implement it so that it works as expected.
+
+    All three of these extensions can be implemented by mapping to
+    the current language:
+
+        { E || GT }  => erlang:list_to_tuple([E || GT])
+        P {<-} E     => P <- erlang:tuple_to_list(E)
+        P = E        => P <- [E]
+
+    and the reference implementation does exactly that.  However,
+    better implementations are possible, as for that matter are
+    better implementations of list comprehension, and in the mean
+    time at least the code will be no less efficient than what the
+    programmer could have written and the source will be more
+    intention-revealing.
+
+
+
+Backwards Compatibility
+
+    The new comprehension and generator forms are currently syntax
+    errors, so no existing code can be affected by them.
+
+    The new binder form (or rather, the newly correct recognition
+    of binder forms) is currently allowed by the Erlang compiler.
+    However, as explained above, it cannot possibly be USEFUL with
+    its current reading.  It is conceivable that there might be
+    test programs designed to elicit the bug which will stop working
+    once the syntax bug is fixed, but it is not likely that any real
+    code will be affected.
+
+
+
+
+Reference Implementation
+
+    The auxiliary file [1] is a patch file to be applied to erl_parse.yrl.
+    The patched file has been checked by yecc, which is happy
+    with it.  However, that's all the testing that has been done.
+
+    This implementation does the three source to source rewrites
+    described in the previous section, entirely in the parser.
+    The rest of the Erlang system needs no changes whatever.
+
+
+
+References
+    
+    [1] Patch file to be applied to erl_parse.yrl: eep-0012-1.diff
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

@@ -1,0 +1,52 @@
+30,31c30,33
+< list_comprehension lc_expr lc_exprs
+< binary_comprehension 
+---
+> list_comprehension   list_arrow
+> tuple_comprehension  tuple_arrow
+> binary_comprehension binary_arrow
+> lc_expr lc_exprs
+180c182,183
+< expr_max -> list_comprehension : '$1'.
+---
+> expr_max -> list_comprehension   : '$1'.
+> expr_max -> tuple_comprehension  : '$1'.
+229d231
+< 
+231a234,237
+> tuple_comprehension -> '{' expr '||' lc_exprs '}' :
+> 	L = line('$1'),
+> 	{call,L,{remote,L,{atom,L,erlang},{atom,L,list_to_tuple}},
+> 	    [{lc,L,'$2','$4'}]}.
+233a240
+> 
+237,239c244,259
+< lc_expr -> expr : '$1'.
+< lc_expr -> expr '<-' expr : {generate,line('$2'),'$1','$3'}.
+< lc_expr -> binary '<=' expr_max : {b_generate,line('$2'),'$1','$3'}.
+---
+> lc_expr -> expr : 
+> 	case '$1' of
+> 	    {match,L,Pat,Exp} ->
+> 		{generate,L,Pat,{cons,L,Exp,{nil,L}}}
+> 	  ; Tst ->
+> 		Tst
+> 	end.
+> lc_expr -> expr   list_arrow   expr     :
+> 	{generate,line('$2'),'$1','$3'}.
+> lc_expr -> expr   tuple_arrow  expr     :
+> 	L = line('$2'),
+> 	{generate,L,'$1',
+> 	  {call,L,{remote,L,{atom,L,erlang},{atom,L,tuple_to_list}},
+> 	    ['$3']}}.
+> lc_expr -> binary binary_arrow expr_max :
+> 	{b_generate,line('$2'),'$1','$3'}.
+240a261,268
+> list_arrow -> '<-'			: '$1'.
+> list_arrow -> '[' '<-' ']'		: '$2'.
+> 
+> tuple_arrow -> '{' '<-' '}'		: '$2'.
+> 
+> binary_arrow -> '<='			: '$1'.
+> binary_arrow -> '<<' '<-' '>>'		: '$2'.
+> 

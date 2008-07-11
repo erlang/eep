@@ -34,7 +34,9 @@ Numerical Index
  S     9  Library for working with binaries              Fredrik Svahn
  S    10  Representing Unicode characters in Erlang      Patrik Nyblom
  S    11  Built in regular expressions in Erlang         Patrik Nyblom
-
+ S    12  Extensions to comprehensions                   Richard A. O'Keefe
+ S    13  -enum declarations                             Richard A. O'Keefe
+ S    14  Guard clarification and extension              Richard A. O'Keefe
 
 Key
 
@@ -58,6 +60,7 @@ Owners
     Kostis Sagonas       <kostis (at) it (dot) uu (dot) se>
     Fredrik Svahn        <Fredrik (dot) Svahn (at) gmail>
     Patrik Nyblom
+    Richard A. O'Keefe   <ok (at) cs (dot) otago (dot) ac (dot) nz>
 
 EEP editor(s) committee
 

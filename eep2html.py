@@ -69,7 +69,9 @@ to templates.  DO NOT USE THIS HTML FILE AS YOUR TEMPLATE!
 DTD = ('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"\n'
        '                      "http://www.w3.org/TR/REC-html40/loose.dtd">')
 
-fixpat = re.compile("((https?|ftp):[-_a-zA-Z0-9/.+~:?#$=&,]+)|(eep-\d+(.txt)?)|"
+fixpat = re.compile("((https?|ftp):[-_a-zA-Z0-9/.+~:?#$=&,]+)|"
+		    "(?P<href>eep-\d+-[-_a-zA-Z0-9/.+:=,]+)|"
+		    "(eep-(?P<eep>\d+)(.txt)?)|"
                     "(RFC[- ]?(?P<rfcnum>\d+))|"
                     "(PEP\s+(?P<pepnum>\d+))|"
                     "(EEP\s+(?P<eepnum>\d+))|"
@@ -108,7 +110,12 @@ def fixanchor(current, match):
                 break
         link = EMPTYSTRING.join(ltext)
     elif text.startswith('eep-') and text <> current:
-        link = os.path.splitext(text)[0] + ".html"
+	eepnum = match.group('eep')
+	if eepnum != None:
+	    eepnum = int(eepnum)
+            link = EEPURL % eepnum
+	else:
+	    link = match.group('href')
     elif text.startswith('EEP'):
         eepnum = int(match.group('eepnum'))
         link = EEPURL % eepnum

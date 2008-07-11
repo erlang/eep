@@ -1,0 +1,418 @@
+EEP: 13
+Title: -enum declarations
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok (at) cs (dot) otago (dot) ac (dot) nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 09-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Erlang programs often need to process data streams using data
+    formats devised without reference to Erlang.  For this reason
+    OTP supports ASN.1 and CORBA, amongst other interface techniques.
+    Binary data streams often contain "symbolic" values that are
+    represented in the original description by some kind of
+    enumeration declaration, often literally a C "enum" declaration.
+
+    This EEP proposes an "-enum" declaration for Erlang for
+    convenient mapping between atoms on one side of an interface and
+    integers on the other, especially in the bit syntax.
+    
+    This replaces some uses of the preprocessor with something that
+    permits the clearer expression of the programmer's intent.
+
+
+
+Specification
+
+    A new form of declaration is added, four new guard BIFs, and a
+    new type specifier for bit syntax.
+
+    Declaration:
+
+        '-' 'enum' '(' identifier-and-size ',' '{' enum-binding
+            {',' enum-binding}* ')' '.'
+
+    where identifier-and-size is
+
+        identifier
+    or
+        identifier : size
+    or
+        identifier / type-specifier-list
+    or
+        identifier : size / type-specifier-list
+
+    and enum-binding is
+
+        identifier '=' constant-integer-expression
+
+    or
+        identifier
+
+    size and type-specifier-list are as in the bit syntax,
+    except that the type-specifier-list may not include a Type.
+    If the size is missing, it will be the first of [8,16,32,64]
+    that is compatible with the integer values, as described later.
+    If the size is present, it must be an integer that is compatible 
+    with the integer values.  Signedness, if present, must agree
+    with the integer values.
+
+    Example:
+
+        -enum(colour, {red,orange,yellow,green,blue}).
+        -enum(fruit:32,  {quandong,lime,banana,orange,apple}).
+
+    The identifier following the left parenthesis is called the
+    "enumeration identifier" and the identifiers bound by the
+    bindings are called "enumerals".
+
+    After -include and -if processing, there should be at most one
+    enum declaration for any identifier.  The identifier must not
+    be one of
+        integer | float | binary | bytes | bitstring | bits
+    Such a declaration only has significance within the constructs
+    defined in this EEP; the only existing notation which is affected
+    is the bit syntax.
+
+    Within a single enum declaration, an enumeral may not be bound in
+    two or more bindings.
+
+    If the first binding does not have an integer-constant-expression,
+    it is as if "= 0" appeared.  If a later binding does not have an
+    integer-constant-expression, it is as if "= N" appeared, where N
+    is one more than the integer value of the previous binding.
+
+    Within a single enum declaration, an integer value may not be used
+    in two or more bindings, whether implicitly or explicitly.
+
+    Built-in functions:
+
+    is_enum_atom(Atom, Enumeration_Identifier)
+        true when Enumeration_Identifier is an atom that is declared
+        as an enumeration identifier and Atom is one of the enumerals
+        in that declaration, false otherwise.
+
+        May be used as a guard test provided
+        Enumeration_Identifier is a literal atom,
+        with a compile-time error if it has no enum declaration.
+
+    is_enum_integer(Integer, Enumeration_Identifier)
+        true when Enumeration_Identifier is an atom that is declared
+        as an enumeration identifier and Integer is an integer that
+        is used as the value in one of the bindings in that
+        declaration, false otherwise.
+
+        May be used as a guard test provided
+        Enumeration_Identifier is a literal atom,
+        with a compile-time error if it has no enum declaration.
+
+    enum_to_atom(Integer, Enumeration_Identifier)
+        when is_enum_integer(Integer, Enumeration_Identifier)
+        ->   the enumeral bound to Integer in the
+             declaration of Enumeration_Identifier
+        otherwise exits with 'badarg'.
+
+        May be used in a guard expression provided
+        Enumeration_Identifier is a literal atom,
+        with a compile-time error if it has no enum declaration.
+
+    enum_to_integer(Atom, Enumeration_Identifier)
+        when is_enum_atom(Atom, Enumeration_Identifier)
+        ->   the integer value that Atom is bound to in the
+             declaration of Enumeration_Identifier
+        otherwise exits with 'badarg'.
+
+        May be used in a guard expression provided
+        Enumeration_Identifier is a literal atom,
+        with a compile-time error if it has no enum declaration.
+
+    All four of these functions are expected to take O(1) time
+    and to allocate no storage at run time.
+
+    Bit syntax extension:
+
+    The Type in a segment of the bit syntax may additionally be
+    an Enumeration_Identifier, and the corresponding Value will
+    then be an atom.  The value in the bit string that is being
+    matched or constructed is or will be the integer bound to
+    the atom; as such the Size, Endianness, Signedness, and Unit
+    are interpreted as for the 'integer' Type.
+
+    In constructing a bit string,
+        V / Enumeration_Identifier ...
+    or  V : Size / Enumeration_Identifier ...
+    acts as if
+        enum_to_integer(V, Enumeration_Identifier) / integer ...
+    or  enum_to_integer(V, Enumeration_Identifier) : Size / integer ...
+    had been written, with one exception, which is now described.
+
+    If all the integer values in an enum declaration are non-negative,
+    let k be the smallest integer such that 2**k is greater than all
+    of them.  If some are negative, let k be the smallest integer such
+    that 2**(k-1) is greater than all of them and -(2**(k-1)) is less
+    than or equal to all of them.  The size of a segment for an
+    enumeration value must then be at least k bits, whatever the
+    actual value.  A programmer who finds a need to bypass this can
+    do the enumeral<->integer conversion manually; what this limit
+    does is to prevent accidental mis-specification.  The size given
+    in the enum declaration must be at least k.  If no size is given
+    in the bit syntax, the size given (or defaulted) in the enum
+    declaration will be used.
+
+    When such a segment is used in pattern matching, it is as if
+    - first an integer is extracted as if the Type had been 'integer',
+    - then the value is converted to an atom as if by 'enum_to_atom',
+    - and finally the atom is matched to whatever pattern appeared.
+    One expects that cases where the value V is an explicit atom
+    will be translated completely at compile time, therefore having
+    no overhead compared with using macros and /integer.
+
+
+
+Motivation
+
+    This was inspired by thinking about PADS and other data
+    description languages.  Imagine a C program doing something like
+
+        enum seriousness {
+            not_serious = 'N',
+            hospitalised = 'H',
+            life_threatening = 'L',
+            congenital_abnormality = 'C',
+            persisting_disability = 'P',
+            intervention_required = 'I',
+            death = 'D'
+        };
+        struct Message {
+            char tag;                       /* a seriousness */
+            union {
+                int   number_of_days;       /* H */
+                float extent_of_disability; /* C or P */
+                char  procedure_code[5];    /* I */
+            } supplement;
+        };
+
+    (The Message structure has been considerably simplified.)
+    Now imagine matching it.
+
+    -define(NOT_SERIOUS, $N).
+    -define(HOSPITALISED, $H).
+    -define(LIFE_THREATENING, $L).
+    -define(CONGENITAL_ABNORMALITY, $C).
+    -define(PERSISTING_DISABILITY, $P).
+    -define(INTERVENTION_REQUIRED, $I).
+    -define(DEATH, $D).
+
+    decode_message(B0) ->
+        case B0
+          of <<?NOT_SERIOUS, B1/binary>> ->
+                {{not_serious}, B1}
+           ; <<?HOSPITALISED, NDays:32, B1/binary>> ->
+                {{hospitalised,NDays}, B1}
+           ; <<?LIFE_THREATENING, B1/binary>> ->
+                {{life_threatening}, B1}
+           ; <<?CONGENITAL_ABNORMALITY, Extent/float, B1/binary>> ->
+                {{congenital_abnormality,Extent}, B1}
+           ; <<?PERSISTING_DISABILITY, Extent/float, B1/binary>> ->
+                {{persisting_abnormality,Extent}, B1}
+           ; <<?INTERVENTION_REQUIRED, Code:5/bytes, B1/binary>> ->
+                {{intervention_required,Code}, B1}
+           ; <<?DEATH, B1/binary>> ->
+                {{death}, B1}
+        end.
+
+    There are a number of problems with this.
+    - You have to use macros; functions are not allowed in patterns.
+    - There is nothing to link these macros together as a group.
+    - So there is no help checking that you are using the right ones.
+    - There is no word to relate them back to the original enum.
+    - If the size isn't 8, it must be repeated in each pattern.
+    - If the Endianness isn't 'big', it must be repeated in each
+      pattern. 
+    - If the size is wrong, too bad.
+    - If a macro from the wrong list is used, too bad.
+    - You cannot use the same enumeral name for more than one
+      enumeration, unless it happens to have the same value in both.
+    - If you pass the macros around in a computation, they look
+      just like numbers to tracers and debuggers; they have no
+      run-time symbolic value.
+
+    Now here's the version using -enum.
+
+    -enum(seriousness : 8, {
+        not_serious = $N,
+        hospitalised = $H
+        life_threatening = $L,
+        congenital_abnormality = $C,
+        persisting_disability = $P,
+        intervention_required = $I,
+        death = $D
+    }).
+
+    decode_message(B0) ->
+        case B0
+          of <<not_serious/seriousness,
+              B1/binary>> ->
+                {{not_serious}, B1}
+           ; <<hospitalised/seriousness,
+               NDays:32, B1/binary>> ->
+                {{hospitalised,NDays}, B1}
+           ; <<life_threatening/seriousness,
+               B1/binary>> ->
+                {{life_threatening}, B1}
+           ; <<congenital_abnormality/seriousness,
+               Extent/float, B1/binary>> ->
+                {{congenital_abnormality,Extent}, B1}
+           ; <<persisting_disability/seriousness,
+                Extent/float, B1/binary>> ->
+                {{persisting_abnormality,Extent}, B1}
+           ; <<intervention_required/seriousness,
+                Code:5/bytes, B1/binary>> ->
+                {{intervention_required,Code}, B1}
+           ; <<death/seriousness,
+               B1/binary>> ->
+                {{death}, B1}
+        end.
+
+    Rather fortuitously, this feature also provides a way of
+    accepting any of a set of atoms or integers with a single
+    guard test.  Let's restructure the previous example to
+    first extract the seriousness and then match the body, but
+    this time, have just one body of each shape.
+
+    -enum(seriousness, {
+        not_serious = $N,
+        hospitalised = $H
+        life_threatening = $L,
+        congenital_abnormality = $C,
+        persisting_disability = $P,
+        intervention_required = $I,
+        death = $D
+    }).
+    -enum(no_more_info, {
+        not_serious = $N,
+        life_threatening = $L,
+        death = $D
+    }).
+    -enum(extent_of_impairment, {
+        congenital_abnormality = $C,
+        persisting_disability = $P
+    }).
+        
+    decode_message(<<Seriousness/seriousness, B0/binary>>) ->
+        if is_enum_atom(Seriousness, no_more_info) ->
+           {{Seriousness}, B0}
+         ; is_enum_atom(Seriousness, extent_of_impairment) ->
+           <<Extent/float, B1/binary>> = B0,
+           {{Seriousness,Extent}, B1}
+         ; Seriousness =:= hospitalised ->
+           <<NDays:32, B1/binary>> = B0,
+           {{Seriousness,NDays}, B1}
+         ; Seriousness =:= intervention_required ->
+           <<Code:5/bytes, B1/binary>> = B0,
+           {{Seriousness,Code}, B1}
+        end.
+
+
+
+Rationale
+
+    Since this is supposed to make it easy to convert descriptions    
+    from C or PADS or similar forms, an enum declaration looks like
+    a C enum declaration.
+
+    Since size, signedness, and endianness may be needed in multiple
+    places, it makes sense to put them all in the declaration so that
+    they don't have to be repeated (and therefore cannot be repeated
+    incorrectly).
+
+    The order of the arguments in the new BIFs is chosen to match
+    the order of the arguments in is_record/2, so as to be familiar
+    to Erlang programmers.
+
+    The new BIFs are needed to explain the extended bit syntax.
+    The only abbreviation in their names is 'enum', which exactly
+    matches the keyword in the declaration.
+
+    The new BIFs can also be used to implement the extended bit
+    syntax by source-to-source transformation; no actual change to
+    the bit syntax machinery is required.
+
+
+
+Backwards Compatibility
+
+    Code that uses any of the four new BIFs will be affected.
+    The nearest that the Erlang/OTP sources come to mentioning
+    any of those atoms is 'enum_to_int', which is used.
+    Code that does use any of these BIFs can be found using
+    cross-reference tools.
+
+    A simple approach would be to say that the BIFs is_enum_atom/2,
+    is_enum_integer/2, enum_to_atom/2, and enum_to_integer/2
+    are in scope in a module if and only if there is an -enum
+    declaration in that module, in which case existing code would
+    be entirely unaffected.
+
+    The effect on the bit syntax is that previously illegal
+    forms (where Type is not one of the existing numeric or bit
+    string types or Value is an atom) become legal, but only if
+    licensed by appropriate -enum declarations.
+
+
+
+Reference Implementation
+
+    There is none.  However, we can sketch one.
+    The four new BIFs are all simple table lookups of the kind that
+    the Erlang compiler already has to be able to generate for
+    indexed clause selection.  As such, they are safe to call in
+    guards.  Since the Type in the bit syntax may only be an
+    enumeration name when it is a literal atom known to the compiler
+    as an enumeration name, the constructor
+        <<... V : S / T X ...>>
+    can be translated as
+        ( V1 = enum_to_integer(V, X), <<... V1 : S / integer X ...>>)
+    and the pattern
+        <<... V : S / T X ...>>
+    can be translated to
+        <<... V' : S / integer X ...>>
+    by adding
+        V =:= enum_to_atom(V', T)
+    to the guard if V occurs elsewhere in the pattern or will be
+    bound in the context, or
+        V = enum_to_atom(V', T)
+    if V would not otherwise become bound.
+
+    Binding like this should be allowed in guards anyway,
+    but in this case it is perfectly safe because it is O(1) and
+    does not require any dynamic storage allocation (unlike, say,
+    arithmetic).
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

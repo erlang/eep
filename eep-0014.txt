@@ -1,0 +1,230 @@
+EEP: 14
+Title: Guard clarification and extension
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok (at) cs (dot) otago (dot) ac (dot) nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 10-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Allow Pattern = Guard_Expression as a simple guard test.
+    Make obviously silly guards syntax errors.
+
+
+Specification
+
+    Replace the opening text of section 6.24 "Guard Sequences"
+    as follows.
+
+	<guard> ::= <OR guard>
+	<OR guard> ::= <AND guard> {';' <AND guard>}*
+
+    An <OR guard> is a sequence of <AND guards> separated by
+    semicolons.  Here, as elsewhere in Erlang, semicolon means
+    sequential OR:  an <OR guard> evaluates its <AND guards>
+    one at a time from left to right, until one succeeds or
+    until all have failed.
+
+	<AND guard> ::= <guard test> {',' <guard test>}*
+
+    An <AND guard> is a sequence of <guard tests> separated by
+    semicolons.  Here, as is often the case in Erlang, comma
+    means sequential AND:  an <AND guard> evaluates its
+    <guard tests> one at a time from left to right, until all
+    have succeeded or one has failed.
+
+	<guard test> ::= <guard match>
+	              | <Boolean expression>
+
+	<guard match> ::= <pattern> '=' <guard expr>
+	               |  <pattern> '=' <guard match>
+
+    A <guard test> is either a match or a Boolean expression.
+    In a guard, a match suceeds if and only if the <guard expr>
+    can be evaluated without exception, and the result can be
+    matched with the <pattern>, possibly binding some variables.
+
+    If a variable is bound in one <guard test>, it may be used in
+    later <guard test>s of the same <AND guard>.  If a variable
+    is bound in all of the <AND guard>s of an <OR guard> it may
+    be used in the guarded code, so
+
+	if  X = 1, is_atom(element(X, Tup))
+         ;  X = 2, is_atom(element(X, Tup))
+         -> ... uses X ...
+
+    is OK.  If a variable is bound in one of the <AND guard>s of
+    an <OR guard> but not all of them it may not be used in the
+    guarded code, so
+
+	if  X = a
+	 ;  Y = b
+         -> ... uses X ...
+
+    is not allowed.
+
+    A <Boolean expression> in a guard consists of a number
+    of subexpressions
+	constant 'false'
+	constant 'true'
+	variable (must be bound to 'false' or 'true')
+	term comparison with <guard expr> operands
+	calls to type test BIFs with <guard expr> operands
+        <Boolean expression>s in parentheses
+    combined using the operators 'not', 'and', 'or',
+    'andalso', and 'orelse'.  Thus
+
+	X+1 == Y
+
+    is a <Boolean expression> that can be used as a <guard test>
+    but
+	
+	X+1
+
+    is not.  You are advised never to use the 'and' and 'or' operators
+    and to avoid 'andalso' and 'orelse' whenever ',' and ';' will do
+    what you need.
+
+    The set of <guard expr>s is a subset of the set of valid Erlang
+    expressions.  The reason for restricting the set of valid
+    expressions is that evaluation of a guard expression must be
+    guaranteed to be free of side effects and to terminate.
+
+    A <guard expr> consists of a number of subexpressions
+	constants
+	variables
+	calls to "other BIFs Allowed in Guard Expressions" (see
+	  table) with <guard expr> arguments
+        record field selections
+	<guard expr>s in parentheses
+    combined using the built in arithmetic and bitwise operators.
+
+
+
+Motivation
+
+    There are two parts to this EEP.  It was originally going to
+    be just about allowing matches in guards.  Then it was going
+    to be two, because the current situation is just too messy,
+    but then it became one again for brevity.
+
+    Consider this case.  A function is given a tuple and an index.
+    If the element at that index is in the range 0..127, it
+    should be returned.  Otherwise some other clause should apply.
+    Currently, we have to write
+
+	f(Tuple, Index)
+	    when is_integer(element(Tuple, Index)),
+		 0 =< element(Tuple, Index),
+		 element(Tuple, Index) =< 127
+	      -> element(Tuple, Index);
+	...
+
+    or something else which is even clumsier.  Why can't we write
+
+	f(Tuple, Index)
+	    when X = element(Tuple, Index),
+	         is_integer(X), 0 =< X, X =< 127
+	      -> X;
+	...
+
+    In trying to explain how to add this to the language, I found
+    that the current description of guards in the Erlang reference
+    manual is remarkably fuzzy.  Dismayingly, this is matched
+    by an equally fuzzy implementation.  The description mixes
+    up things that can be used as arguments of guard BIFs
+    (guard expressions) with simple guards.
+
+    Consider the example
+
+	X = 1,
+	if X+1 -> true
+         ; X-1 -> false
+	end.
+
+    This clearly makes no sense at all, and should be rejected
+    as bad syntax.  According to the current reference manual,
+    it is legal; X+1 and X-1 are legal "guard expressions".
+
+    In the shell, this exampel crashes, which indeed makes
+    a lot of sense.  But 'erlc' says
+    {X+1} Warning: the guard for this clause evaluates to 'false'
+    {X-1} Warning: the guard for this clause evaluates to 'false'
+    It is good that there is a warning, but bad that the text of
+    the warning is wrong.  These things DON'T evaluate to 'false',
+    they evaluate to numbers.  Then, despite having given a warning,
+    you get a run-time error.
+
+    exited: {if_clause,[{a,f,0},{shell,exprs,6},{shell,eval_loop,3}]}
+
+    What happened in this example, of course, was that all of the
+    clauses of the 'if' were eliminated because all of them were
+    malformed.  More realistic examples would simply quietly do the
+    wrong thing at run time.
+
+
+
+Rationale
+
+    The syntax for allowing matches in guards is obvious;
+    no other syntax would be tolerable.  The only real question
+    is whether they can be embedded inside 'andalso' and 'orelse'
+    or not, and in order to avoid questions of backtracking, I
+    have said "no".  This is really the simplest extension of
+    guards to allow matches that I can think of.
+
+    The rest of the EEP is concerned with trying to rule out
+    obviously silly guard tests at compile time.  Precisely how
+    this is done is debateable.  That it should be done surely
+    isn't.  What benefit do we currently obtain (other than
+    unwarranted simplicity in the compiler) from allowing "27"
+    and "X+5" as guards?
+
+
+
+Backwards Compatibility
+
+    Matches are currently not allowed in guards, so no existing
+    application code can be broken by adding them.  Obviously,
+    anything that works with Erlang parse trees will need to be
+    extended.
+
+    Cleaning up what's allowed in guards may affect existing code.
+    However, in most cases the compiler would already have warned
+    about this, and the compatibility issue amounts to turning a
+    warning message into an error message.
+
+
+
+Reference Implementation
+
+    None.
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

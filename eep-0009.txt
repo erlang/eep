@@ -1,4 +1,4 @@
-EEP:            0009
+EEP:            9
 Title:          Library for working with binaries
 Version:        $Revision$
 Last-Modified:  $Date$

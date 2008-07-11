@@ -74,9 +74,10 @@ enhancements or patches often don't need a EEP and can be injected
 into the Erlang development work flow by sending a patch to
 erlang-patches@erlang.org.
 
-The EEP champion then emails the EEP editor <eeps@erlang.org> with a
-proposed title and a rough, but fleshed out, draft of the EEP.  This
-draft must be written in EEP style as described below.
+The EEP champion subscribes to the email list <eeps@erlang.org> (see
+http://www.erlang.org/mailman/listinfo/eeps) and sends a rough
+but fleshed out draft of the EEP, with a proposed title, to that list.
+This draft must be written in EEP style as described below.
 
 If the EEP editor approves, he will assign the EEP a number, label it
 as Standards Track or Process, give it status "Draft",
