@@ -37,6 +37,13 @@ Numerical Index
  S    12  Extensions to comprehensions                   Richard A. O'Keefe
  S    13  -enum declarations                             Richard A. O'Keefe
  S    14  Guard clarification and extension              Richard A. O'Keefe
+ S    15  Portable funs                                  Richard A. O'Keefe
+ S    16  is_between/3                                   Richard A. O'Keefe
+ S    17  Fix andalso and orelse                         Richard A. O'Keefe
+ S    18  JSON bifs                                      Richard A. O'Keefe
+ S    19  Comprehension multigenerators                  Richard A. O'Keefe
+ S    20  Split the atoms!                               Richard A. O'Keefe
+ S    21  Optional trailing commas for lists and tuples  Richard A. O'Keefe
 
 Key
 

@@ -1,0 +1,224 @@
+*** parse1.yrl	Thu Jul 10 13:50:11 2008
+--- parse1d.yrl	Tue Aug 12 12:27:31 2008
+***************
+*** 29,37 ****
+  list tail
+  list_comprehension lc_expr lc_exprs
+  binary_comprehension 
+! tuple
+  %struct
+! record_expr record_tuple record_field record_fields
+  if_expr if_clause if_clauses case_expr cr_clause cr_clauses receive_expr
+  fun_expr fun_clause fun_clauses
+  %% cond_expr cond_clause cond_clauses
+--- 29,38 ----
+  list tail
+  list_comprehension lc_expr lc_exprs
+  binary_comprehension 
+! tuple tup_tail tup_body
+  %struct
+! record_expr
+! record_tuple record_field rec_body rec_tail
+  if_expr if_clause if_clauses case_expr cr_clause cr_clauses receive_expr
+  fun_expr fun_clause fun_clauses
+  %% cond_expr cond_clause cond_clauses
+***************
+*** 43,50 ****
+  rule rule_clauses rule_clause rule_body
+  binary bin_elements bin_element bit_expr
+  opt_bit_size_expr bit_size_expr opt_bit_type_list bit_type_list bit_type
+! top_type top_types type typed_expr typed_attr_val 
+! typed_exprs typed_record_fields.
+  
+  Terminals
+  char integer float atom string var
+--- 44,52 ----
+  rule rule_clauses rule_clause rule_body
+  binary bin_elements bin_element bit_expr
+  opt_bit_size_expr bit_size_expr opt_bit_type_list bit_type_list bit_type
+! top_type top_type_one top_type_two top_type_list top_type_body top_type_tail
+! type typed_expr typed_attr_val 
+! typed_record_fields trf_body trf_tail.
+  
+  Terminals
+  char integer float atom string var
+***************
+*** 76,112 ****
+  
+  typed_attr_val -> expr ',' typed_record_fields : ['$1' , '$3'].
+  
+! typed_record_fields -> '{' typed_exprs '}' : {tuple,line('$1'),'$2'}.
+  
+! typed_exprs -> typed_expr                 : ['$1'].
+! typed_exprs -> typed_expr ',' typed_exprs : ['$1'|'$3'].
+! typed_exprs -> expr ',' typed_exprs       : ['$1'|'$3'].
+! typed_exprs -> typed_expr ',' exprs       : ['$1'|'$3'].
+  
+! typed_expr -> expr '::' top_type          : {typed,'$1','$3'}.
+  
+! top_types -> top_type                     : ['$1'].
+! top_types -> top_type ',' top_types       : ['$1'|'$3'].
+  
+  top_type -> type                          : '$1'.
+  top_type -> type '|' top_type             : lift_unions('$1','$3').
+  
+  type -> atom                              : {type, atom, [normalise('$1')]}.
+  type -> atom '(' ')'                      : build_type('$1', []).
+! type -> atom '(' top_type ')'             : build_type('$1', ['$3']).
+! type -> atom '(' top_type ',' top_type ')': build_type('$1', ['$3', '$5']).
+  type -> '[' ']'                           : {type, nil, []}.
+  type -> '[' top_type ']'                  : {type, list, ['$2']}.
+  type -> '[' top_type ',' '.' '.' '.' ']'  : {type, nonempty_list, ['$2']}.
+! type -> '(' '(' ')' '->' top_type ')'     : {type, 'fun', [[], '$5']}.
+! type -> '(' '(' top_types ')' '->' top_type ')' : {type, 'fun', ['$3', '$6']}.
+  type -> '{' '}'                           : {type, tuple, []}.
+! type -> '{' top_types '}'                 : {type, tuple, '$2'}.
+  type -> '#' atom '{' '}'                  : {type, record, [normalise('$2')]}.
+  type -> integer                           : {type, integer, [normalise('$1')]}.
+  type -> '(' integer '.' '.' integer ')'   : 
+  			{type, range, [normalise('$2'), normalise('$5')]}.
+  
+  attr_val -> exprs : '$1'.
+  
+  function -> function_clauses : build_function('$1').
+--- 78,135 ----
+  
+  typed_attr_val -> expr ',' typed_record_fields : ['$1' , '$3'].
+  
+! %% typed_record_fields is '{' e1,...,en '}'
+! %% where each ei is either an expr or a typed expr
+! %% and at least one ei is a typed expr.
+  
+! typed_record_fields -> '{' trf_body : {tuple,line('$1'),'$2'}.
+  
+! trf_body -> typed_expr tup_tail : ['$1'|'$2'].
+! trf_body -> typed_expr trf_tail : ['$1'|'$2'].
+! trf_body -> expr       trf_tail : ['$1'|'$2'].
+  
+! trf_tail -> ',' trf_body : '$2'.
+  
++ tup_body -> expr tup_tail : ['$1'|'$2'].
++ 
++ tup_tail -> '}'           : [].
++ tup_tail -> ',' '}'       : [].
++ tup_tail -> ',' tup_body  : '$2'.
++ 
++ typed_expr -> expr '::' top_type          : {typed,'$1','$3'}.
++ 
+  top_type -> type                          : '$1'.
+  top_type -> type '|' top_type             : lift_unions('$1','$3').
+  
+  type -> atom                              : {type, atom, [normalise('$1')]}.
+  type -> atom '(' ')'                      : build_type('$1', []).
+! type -> atom '(' top_type_two             : build_type('$1', '$3').
+  type -> '[' ']'                           : {type, nil, []}.
+  type -> '[' top_type ']'                  : {type, list, ['$2']}.
+  type -> '[' top_type ',' '.' '.' '.' ']'  : {type, nonempty_list, ['$2']}.
+! type -> '(' '(' ')'           '->' top_type ')' : {type, 'fun', [[],  '$5']}.
+! type -> '(' '(' top_type_list '->' top_type ')' : {type, 'fun', ['$3','$5']}.
+  type -> '{' '}'                           : {type, tuple, []}.
+! type -> '{' top_type_body                 : {type, tuple, '$2'}.
+  type -> '#' atom '{' '}'                  : {type, record, [normalise('$2')]}.
+  type -> integer                           : {type, integer, [normalise('$1')]}.
+  type -> '(' integer '.' '.' integer ')'   : 
+  			{type, range, [normalise('$2'), normalise('$5')]}.
+  
++ top_type_one -> top_type ')'              : ['$1'].
++ 
++ top_type_two -> top_type_one              : '$1'.
++ top_type_two -> top_type ',' top_type_one : ['$1'|'3'].
++ 
++ top_type_list -> top_type ')'		    : ['$1'].
++ top_type_list -> top_type ',' top_type_list : ['$1'|'$3'].
++ 
++ top_type_body -> top_type top_type_tail   : ['$1'|'$2'].
++ 
++ top_type_tail -> '}'			  : [].
++ top_type_tail -> ',' '}'		  : [].
++ top_type_tail -> ',' top_type_body	  : '$2'.
++ 
+  attr_val -> exprs : '$1'.
+  
+  function -> function_clauses : build_function('$1').
+***************
+*** 192,202 ****
+  expr_max -> query_expr : '$1'.
+  
+  
+! list -> '[' ']' : {nil,line('$1')}.
+  list -> '[' expr tail : {cons,line('$1'),'$2','$3'}.
+  
+! tail -> ']' : {nil,line('$1')}.
+! tail -> '|' expr ']' : '$2'.
+  tail -> ',' expr tail : {cons,line('$2'),'$2','$3'}.
+  
+  
+--- 215,226 ----
+  expr_max -> query_expr : '$1'.
+  
+  
+! list -> '[' ']'       : {nil,line('$1')}.
+  list -> '[' expr tail : {cons,line('$1'),'$2','$3'}.
+  
+! tail -> ']'           : {nil,line('$1')}.
+! tail -> ',' ']'       : {nil,line('$1')}.
+! tail -> '|' expr ']'  : '$2'.
+  tail -> ',' expr tail : {cons,line('$2'),'$2','$3'}.
+  
+  
+***************
+*** 239,245 ****
+  lc_expr -> binary '<=' expr_max : {b_generate,line('$2'),'$1','$3'}.
+  
+  tuple -> '{' '}' : {tuple,line('$1'),[]}.
+! tuple -> '{' exprs '}' : {tuple,line('$1'),'$2'}.
+  
+  
+  %%struct -> atom tuple :
+--- 263,269 ----
+  lc_expr -> binary '<=' expr_max : {b_generate,line('$2'),'$1','$3'}.
+  
+  tuple -> '{' '}' : {tuple,line('$1'),[]}.
+! tuple -> '{' tup_body : {tuple,line('$1'),'$2'}.
+  
+  
+  %%struct -> atom tuple :
+***************
+*** 259,271 ****
+  record_expr -> expr_max '#' atom record_tuple :
+  	{record,line('$2'),'$1',element(3, '$3'),'$4'}.
+  
+! record_tuple -> '{' '}' : [].
+! record_tuple -> '{' record_fields '}' : '$2'.
+  
+! record_fields -> record_field : ['$1'].
+! record_fields -> record_field ',' record_fields : ['$1' | '$3'].
+  
+! record_field -> var '=' expr : {record_field,line('$1'),'$1','$3'}.
+  record_field -> atom '=' expr : {record_field,line('$1'),'$1','$3'}.
+  
+  %% N.B. This is called from expr_700.
+--- 283,298 ----
+  record_expr -> expr_max '#' atom record_tuple :
+  	{record,line('$2'),'$1',element(3, '$3'),'$4'}.
+  
+! record_tuple -> '{' '}'      : [].
+! record_tuple -> '{' rec_body : '$2'.
+  
+! rec_body -> record_field rec_tail : ['$1'|'$2'].
+  
+! rec_tail -> '}'                   : [].
+! rec_tail -> ',' '}'		  : [].
+! rec_tail -> ',' rec_body	  : '$2'.
+! 
+! record_field -> var  '=' expr : {record_field,line('$1'),'$1','$3'}.
+  record_field -> atom '=' expr : {record_field,line('$1'),'$1','$3'}.
+  
+  %% N.B. This is called from expr_700.
+***************
+*** 898,900 ****
+--- 925,928 ----
+  func_prec() -> {800,700}.
+  
+  max_prec() -> 1000.
++ 

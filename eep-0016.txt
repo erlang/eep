@@ -1,0 +1,214 @@
+EEP: 16
+Title: is_between/3
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 23-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    There should be a new built in function for guards,
+
+    is_between(Term, Lower_Bound, Upper_Bound)
+
+    which succeeds when Term, Lower_Bound, and Upper_Bound
+    are all integers, and Lower_Bound =< Term =< Upper_Bound.
+
+
+
+
+Specification
+
+    A new guard BIF is added.
+
+    is_between(Term, LB, UB)
+
+    In expression use, if LB or UB is not an integer,
+    a badarith exception is thrown, just like an attempt to
+    do remainder or bitwise operations on non-integer arguments.
+    In guard use, that exception becomes failure.
+
+    This is a type test which succeeds (or returns true) if
+    Term is an integer and lies between LB and UB inclusive,
+    and fails (or returns false) for other values of Term.
+
+    As an expression, it has the same effect as
+        ( X = Term, Y = LB, Z = UB,
+          Y bor Z,
+          ( is_integer(X), X >= Y, X =< Z )
+        )
+
+    where X, Y, and Z are new variables that are not exported.
+    In particular,
+        is_integer(tom, dick, harry)
+    should raise an exception, not return false, as is_integer(Term)
+    is only tested after LB and UB have been found to be integers.
+
+    As a guard test, it has the same effect as
+        ( X = Term, Y = LB, Z = UB,
+          is_integer(Y), is_integer(Z), is_integer(X),
+          X >= Y, X =< Z
+        )
+    would have, were that allowed.  However, it admits a much
+    more efficient implementation.
+
+
+
+Motivation
+
+    Currently some people test whether a variable is a byte thus:
+    
+        -define(is_byte(X), (X >= 0 andalso X =< 255)).
+
+    This is actual current practice.  However, it fails to check
+    that X is an integer, so ?is_byte(1.5) succeeds, it may
+    evaluate X twice, so ?is_byte((Pid ! 0)) will send two messages,
+    not the expected one, and the current Erlang compiler generates
+    noticeably worse code in guards for 'andalso' and 'orelse' than
+    it does for ',' and ';'.
+
+    It is also useful to test whether a subscript is in range,
+
+        -define(in_range(X, T), (X >= 1 andalso X =< size(T))).
+
+    which has similar problems.
+
+    Using is_between, we can replace these definitions with
+
+        -define(is_byte(X),     is_between(X, 0, 255)).
+        -define(in_range(X, T), is_between(X, 1, size(T))).
+
+    which are free of those problems
+
+
+
+Rationale
+
+    One alternative to this design would be to follow the example
+    of Common Lisp (and the even earlier example of the systems
+    programming language on HP 3000s) and allow
+        E1 =< E2 =< E3      % (<= E1 E2 E3) in Lisp
+    (and possibly also
+        E1 =< E2 <  E3
+        E1 <  E2 =< E3
+        E1 <  E2 <  E3)     % (<  E1 E2 E3) in Lisp
+    as guards and expressions, evaluating each expression exactl
+    once.  I am very fond of this syntax and would be pleased to
+    see it.  This would resolve the double evaluation of E2, the
+    possible non-evaluation of E3, and the inefficiency of 'andalso'.
+    However, it would not address the problem that a byte or an
+    index is not just a NUMBER in a certain range, but an INTEGER.
+    If Erlang had multiple comparison syntax, there would still be
+    a use for is_between/3.
+
+
+
+Backwards Compatibility
+
+    Code that defines a function named is_between/3 will be
+    affected.  Since the Erlang compiler parses an entire
+    module before semantic analysis, it's easy to
+        - check for a definition of is_between/3
+        - warn if one is present
+        - disable the new built-in in such a case.
+
+
+
+Reference Implementation
+
+    There is none.  However, we can sketch one.
+    Two new BEAM instructions are required:
+
+        {test,is_between,Lbl,[Src1,Src2,Src3]}
+        {bif,is_between,?,[Src1,Src2,Src3],Dst}
+
+    The test does
+        if Src2 is not an integer, goto Lbl.
+        if Src3 is not an integer, goto Lbl.
+        if Src1 is not an integer, goto Lbl.
+        if Src1 < Src2, goto Lbl.
+        if Src3 < Src1, goto Lbl.
+
+    The bif does
+        if Src2 is not an integer, except!
+        if Src3 is not an integer, except!
+        if Src1 is not an integer
+        or Src1 < Src2
+        or Src3 < Src1
+        then move 'false' to Dst
+        else move 'true'  to Dst.
+
+    Nothing here is fundamentally new, and only my unfamiliarity with
+    how to add instructions to the emulator prevents me doing it.  And
+    my total ignorance of how to tell HiPE about them!
+
+    There might be some point in having variants of these instructions
+    for use when Src2 and Src3 are integer literals; I would certainly
+    expect HiPE to elide redundant tests here.
+
+    The compiler would simply recognise is_between/3 and emit the
+    appropriate BEAM rather like it recognises is_atom/1.
+    My ignorance of how to extend the emulator is exceeded by my
+    ignorance of how to extend the compiler.  Certainly we'd need
+        ...
+        is_bif(erlang, is_between, 3) -> true;
+        ...
+        is_guard_bif(erlang, is_between, 3) -> true;
+        ...
+        is_pure(erlang, is_between, 3) -> true;
+        ...
+    (but NOT an is_safe rule) in erl_bifs.erl.  Or would we?  I've
+    not been able to figure out where is_guard_bif/3 is called.
+    There will need to be a new entry in genop.tab as well.
+    Ohhh, erl_internal.erl is in .../stdlib, not .../compiler.
+    OK, so a couple of functions in erl_internal.erl need to be patched
+    to recognise is_between/3; what needs changing to generate BEAM?
+    The annoying thing is that if I knew my way around the compiler,
+    it would be easier to add this than to write it up.
+
+    Here's some text to go in the documentation:
+    ----------------------------------------------------------------
+    is_integer(Term, LB, UB) -> bool()
+
+        Types:
+            Term = term()
+            LB = integer()
+            UB = integer()
+
+        Returns true if Term is an integer lying between LB
+        and UB inclusive (LB =< Term, Term =< UB); otherwise
+        returns false.  In an expression, raises an exception
+        if LB or UB is not an integer.  Having UB < LB is not
+        an error.
+
+         Allowed in guard tests.
+    ----------------------------------------------------------------
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

@@ -1,0 +1,258 @@
+EEP: 20
+Title: Split the atoms!
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 05-Aug-2008
+
+Post-History:
+
+
+
+Abstract
+
+    An idea from the Logix implementation of Flat Concurrent Prolog
+    can be adapted to Erlang:  invisibly to users there can be two
+    implementations of 'atoms', fixing a major system integrity
+    issue and removing the need to warp one's data structure design
+    to code around it.
+
+
+
+Specification
+
+    There are no user-visible changes to the Erlang language or
+    libraries.  Interfaces between Erlang and other languages such
+    as C may need to be changed.
+
+    We split atoms into two classes:  "global" atoms are those atoms
+    which either appear in the post-preprocessing text of some loaded
+    module or are the registered name of any process; "local" atoms
+    are all others which a process creates.
+
+    A local atom is represented by a data structure SUCH AS
+
+        +----------+
+        | size+tag |    boxed object header; see below
+        +----------+
+        | hashcode |    a 32-bit hash code
+        +----------+
+        | equivrep |    points to Union/Find representative
+        +----------+
+        | bytes of |
+        | name ... |
+        +----------+
+
+    As usual, the size+tag contains a 2 bit tag to say it is an
+    IMMED2 object, a 4-bit subtag to say what kind (I propose
+    1011), and a 26-bit arity.  However, the arity field is
+    split into two subfields:
+
+        +--------------+------------+----+--+
+        |  byte count  | char count |LATM|BX|
+        +--------------+------------+----+--+
+                     14           12    4   2   size in bits
+
+    The char count says how many Unicode characters there are in
+    the name.  The byte count says how many bytes those characters
+    are stored in.  For compactness and backwards compatibility,
+    an atom whose name consists only of Latin-1 characters has
+    byte count = char count and name represented as Latin-1; atoms
+    with names outside that range are held in some other form
+    _such as_ UTF-8, SCSU, BOCU, or what have you.  This proposal
+    is not specifically about encoding schemes; all I have to say
+    here is that it should be the same for all atoms and it should
+    be at least as good as UTF-8.
+
+    The hash code field is a 32-bit hash code.  Again, I have
+    nothing to say about atom hashes as such except to say that
+    the method should be the same for all atoms in all processes
+    on a node and that it should be a good one.  Advice about
+    good hashing functions is hard to find.  hashpjw() can be
+    improved on.  I heartily recommend Valloud's book [1].
+
+    The equivrep field is a pointer.  It always points to an atom,
+    which may be a global atom or a local atom.  Initially, it points
+    to the local atom itself.  When a local atom is compared with
+    another local atom,
+
+        first,   check the header fields to see if they match
+        second,  check the hash codes to see if they match
+        finally, check the bytes of the names.
+
+    But this is also combined with Union/Find, very much like
+    binding variables in Prolog.  So we "dereference" (chase the
+    equivrep fields) after the second step, and if we end up at
+    the same place, the two local atoms are equal.  And if two
+    physically distinct local atoms do turn out equal, we make
+    the younger one (the one most recently created) point to the
+    older one.
+
+    Global atoms should have a similar representation; I suggest that
+    the representation of a local atom should be embedded in the
+    representation of a global atom, so that local atoms can be
+    compared with global atoms as if they were both local.
+
+    Atoms returned by list_to_existing_atom/1 are always global atoms.
+    Atoms returned by list_to_atom/1 or binary_to_term/1 are global
+    atoms if and only if they are already existing global atoms,
+    otherwise they are local atoms.
+
+    Interfaces provided to other languages, such as C or Java, should
+    leave existing atom-creation operations returning global atoms,
+    and should add operations for creating local atoms.
+
+    When a process is garbage collected, a pointer to a local atom is
+    replaced by that local atom's equivrep, so that processes that
+    have ever noticed they have duplicate local atoms don't keep them
+    forever.
+
+
+Motivation
+
+    There are a number of problems that limit the usefulness
+    of Erlang atoms.
+
+    The first is that atom size is limited to 255 bytes,
+    which makes Erlang atoms of very little use for file names,
+    as C's FILENAME_MAX is typically 1024 these days.
+    
+    The second is that atoms are limited to Latin-1 characters.
+    We really do want full Unicode support for them, not so
+    much for programmers to write atoms in strange scripts in
+    their source code as to allow information to flow _through_
+    an Erlang system as atoms.
+
+    Those two are minor problems.
+
+    The major problem is the atom table.
+
+    It is a global resource, which means that on an SMP system
+    there has to be a lot of locking and unlocking.  This proposal
+    doesn't include a new "always return a local atom" operation,
+    but it creates the possibilities for new operations like that
+    which require no locking.
+   
+    The atom table is limited, in atom.c, to ATOM_LIMIT=1024*1024
+    entries.  Even on a 32-bit system, this is smaller than a
+    machine could support; it is an arbitrary limit, and such limits
+    are always a problem.
+
+    The atom table is not garbage collected.  Once an atom has been
+    created, it says created.  Historic Prolog systems, like Quintus
+    Prolog, did the same thing.  Back in 1984 this was recognised as
+    a problem, especially for programs that wanted to access large
+    volumes of stored data.  Modern Prolog systems, like SWI Prolog,
+    do collect atoms; SWI Prolog would not be nearly so useful for
+    manipulating large collections of RDF data if it were otherwise.
+    This proposal does not add garbage collection for the atom table;
+    what it does is to stop most of the atoms that would have been
+    collected ever entering that table in the first place.
+
+    Filling up the atom table crashes or hangs the entire node.
+
+    This means that it is far too easy to crash or hash Erlang
+    software by feeding it too many atoms.
+
+    And _that_ means that Erlang programmers who would like to use
+    atoms in data structures (as keys in dictionaries, say) use
+    binaries instead: binaries are not limited in size or number,
+    can hold UTF-8 if you want them to, are garbage collected, and
+    are generally safer to use.
+
+    While this proposal makes atoms more _convenient_ to use (they
+    may be longer, more numerous, and may contain Unicode), the
+    real point is to make atoms _safer_ to use.  If you can
+    stream data from source through an Erlang process, mapping
+    external "strings" to binaries, you will be able to do the
+    same thing just as safely mapping them to atoms.
+
+
+
+Rationale
+
+    Erlang is not the first language to face these problems.
+    It isn't even the first concurrent language to face them.
+    Flat Concurrent Prolog was there first, and while I have
+    not seen the Logix source code, the idea was explained in
+    Logix documentation many years ago.  I know this *can*
+    work because it *did* work.
+
+    Logix used this approach for all atoms; eventually, I
+    believe Erlang will need to as well in order to handle
+    thousands of processors without lots of locks.  Right now,
+    it makes sense to keep on using the old representation for
+    fairly "static" atoms.  In particular, we would like module
+    and function names (and frame keys when we have them) to be
+    just the way they are now.  If an application is loaded after a
+    local atom has been created, we may find that it is a module
+    name or function name after all; this is one of the reasons
+    for the equivrep field.  Once it's noticed, the duplication
+    won't survive another garbage collection.
+
+    The current 'global atom' representation has a hack to make
+    term comparison faster.  For simplicity I have not described
+    it above, because that's orthogonal to the issues this EEP is
+    concerned with.  I note (a) that for the ord0 field to
+    continue in its present form, the encoding would best be
+    UTF-8 or BOCU, and (b) to keep the compactness of the Latin-1
+    atoms, the ord0 field should be the first 31 bits that *would*
+    have been stored had the atom been stored in whichever of
+    UTF-8 or BOCU is chosen.  I also note (c) that if you don't
+    allow "native" byte ordering to dictate the order in which the
+    bytes of an atom's name are stored, you don't *need* a special
+    ord0 field.
+
+    I should confess that this proposal doesn't _entirely_ avoid the
+    crashes and hangs problem.  If an Erlang system can be persuaded
+    to load modules from an untrustworthy source, it can still be
+    made to try to create enough atoms to get into trouble.  This is
+    one of the reasons that I think Erlang will eventually have to
+    abandon the global atom table.  However, anyone who loads modules
+
+    from untrustworthy sources should KNOW they are doing that; it is
+    an obviously dangerous thing to do.  list_to_atom/1 is NOT an
+    obviously dangerous function, and it should not be any more
+    dangerous than list_to_binary/1.
+
+
+
+Backwards Compatibility
+
+    No existing code (outside the Erlang implementation)
+    should be affected in the slightest.
+
+
+
+Reference Implementation
+
+    None.  The change is simple in concept, but affects several
+    atoms in the core of the system.
+
+
+
+References
+    
+    [1] Hashing in Smalltalk: Theory and Practice
+        Andrés Valloud,
+        http://www.lulu.com/content/1455536
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

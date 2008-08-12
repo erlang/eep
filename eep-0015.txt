@@ -1,0 +1,281 @@
+EEP: 15
+Title: Portable funs
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 15-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Current Erlang has two kinds of funs.  An "external" fun,
+    Module:Name/Arity, is just a name and can be used freely.
+    A "local" fun contains code that is bound to the module it
+    was defined in.  This means that you cannot save internal
+    funs in data bases or send them to remote systems and expect them to
+    work.
+
+    I propose a "portable fun", which is a syntactically restricted
+    kind of fun.  The restriction ensures that a programmer knows
+    (and the run time can discover) exactly what modules are/will be
+    required.  These funs can be safely sent to remote nodes, and 
+    can safely be stored in data bases, retrieved at a later time,
+    and executed.  Nor need a process holding a reference to such a
+    fun be killed when the module it came from is unloaded.
+
+    A new way of implementing these funs is required for best speed,
+    so this is quite a large change.  However, a prototype that
+    interpreted portable functions would be possible.
+
+
+
+Specification
+
+    Currently, Erlang has
+
+	fun_expr -> 'fun' fun_clauses 'end' : ...
+
+    We add
+
+	fun_expr -> 'fun' '!' fun_clauses 'end' : ...
+
+    and make the following restrictions:
+
+    (a) A portable fun may not contain plain funs.
+    (b) A portable fun may not contain a call f(...)
+        without a module prefix unless f is a built-in
+        function.
+    (c) A portable fun may not contain any call of the
+        form M:f(...) or m:F(...) or M:F(...).
+    (d) A portable fun may not contain any call of the
+        form F(...) unless F is bound in its head.
+    (e) In a system where abstract patterns are available,
+        they are restricted the same way as function calls.
+
+    The intent of these restrictions is to ensure that
+    every call is to a built in function, a known export
+    of a known module, or to some kind of fun received as
+    a parameter.
+
+    The built-in function erlang:fun_info/1 is extended in
+    the following ways:
+    (1) In a {type,Type} item, Type may be 'portable'.
+    (2) In a {module,Module} item for a portable fun, the Module
+        will be present, but there will in fact be no other
+        connection between a portable fun and any module by that
+        name.
+    (3) In a {name,Name} item for a portable fun,
+        Name will always be [].
+    (4) None of the items specified for 'local' funs will be
+        returned for 'portable' funs.
+    (5) {calls,List} will be returned for a portable fun,
+        where List is a list of {Module,Imports} pairs, where
+        each Module that is used in a remote call in the fun is
+        listed once, and the Imports are a list of {Name,Arity}
+        pairs as reported in *:module_info/0.  This permits the
+        receiver of a portable fun to determine which modules
+        need loading and which functions they are expected to
+        export.
+    (6) For consistency,
+	erlang:fun_info(fun M:F/A, calls)
+	=> [{M,[{F,A}]}]
+
+    The built-in function erlang:fun_info/2 is extended similarly.
+    An additional key 'source' is provided for this function.
+    fun_info(Fun, source)
+	- for a local fun, the result is 'undefined'.
+	- for an external fun, the result is the abstract syntax
+	  tree the parser returns for fun M:F/A.
+	- for a portable fun, the result is the abstract syntax
+	  tree the parser returned for the fun!..... end form
+	  it came from.
+
+    The built-in functions-and-guard-predicates
+    erlang:is_function(Term) and erlang:is_function(Term, Arity)
+    accept portable funs as well as external and local ones.
+
+    Two new built-in functions-and-guard-predicates
+    erlang:is_portable_function(Term)
+    erlang:is_portable_function(Term, Arity)
+    are provided, which recognise 'portable' and 'external' functions.    
+    (This proposal will definitely need to be revised to make the
+    names clearer.)
+
+
+
+Motivation
+
+    Imagine that you have an Erlang node reporting events to clients
+    on other nodes.  Clients wish to receive only a few of the events.
+    One approach is for the reporter to send all events to all clients
+    and let the clients do the filtering.  A better approach lets the
+    clients tell the reporter which events they want, and for it to
+    send just the interesting events.  But how do the clients tell the
+    reporter which events they are interested in?
+
+    One approach is to simply have a fixed set of event classes.
+    That is too coarse.
+
+    Another approach would be to define an event description language,
+    perhaps based in some way on match specifications.
+    That is better, but there is currently no way to compile match
+    specifications (that's another thing this is for!) so matching is
+    slow, and it is still limited; the reporter might want to provide
+    summary functions that the filters can use.
+
+    Another approach would be to send a fun, which is really the
+    obvious way to do it.  Unfortunately, this currently will not work,
+    and there are reasons why it shouldn't.  (For example, the body of
+    a local function may have been subject to inline expansion of
+    functions whose definitions on the receiving node are different.)
+
+    Another approach would be to send an entire module as a binary.
+    This gets a bit heavyweight.  It also creates a problem of managing
+    possibly large numbers of modules in the reporter.  It is also
+    insecure unless the reporter does a lot of work to verify the code
+    for safety.  Long term, it will also create version skew problems
+    if the client and reporter are not using exactly the same BEAM
+    (or other VM).
+
+    For another example, consider storing functions in a data base.
+    Since a local fun is tied to a specific version of a specific
+    module, if you save a function one month, upgrade your system,
+    and restore the module next month, you cannot expect it to work.
+    This means that, for example, you cannot store a binary together
+    with a function that knows how to decode it.
+
+    For another example, consider something like a data base that
+    dynamically receive matchspecs (or something like matchspecs)
+    and wishes to apply such a thing to millions of records.  It
+    is easy enough to transform a matchspec to Erlang code, and
+    even to compile the result, but now you have a module to manage,
+    not a simple thing that can be cleaned up by a garbage collector.
+
+    Basically, the aim of this proposal is to move Erlang one step
+    further along the "functions are data" functional programming way.
+
+    However, it is necessary to do this in such a way that a process
+    receiving a portable fun does not have to place total trust in
+    the source.  The receiver must be able to inspect a portable fun
+    as well as just call it.
+
+
+
+Rationale
+
+    It would not be a good idea to just add the portability
+    restrictions on top of existing fun syntax.  That would break
+    most programs that use funs.
+
+    Perhaps the obvious thing would be to use #fun...end, as the
+    sharp seems to be Erlang's "oops, we didn't think of that in the
+    Good Old Days" marker, much as it is in Common Lisp.  However, we
+    want that notation for anonymous abstract patterns, and in any
+    case, there is nothing iconic about the sharp in this context.
+
+    The bang is used to suggest that this is a kind of fun that you
+    might want to send, which indeed it is.  As for where it is
+    placed, the bang is to be thought of as post-modifying the 'fun'
+    keyword, not as pre-modifying the argument list, so that
+	fun!({a,X}) -> ...
+	   ;({b,Y}) -> ...
+	end
+    does not have a repeated bang.
+
+    What do you send when you send a portable fun?
+    - the environment, of course
+    - some sort of header, of course
+    - but what does the CODE look like?
+    If it is native code, you can't send a fun from a SPARC to a Mac.
+    If it is BEAM code, you can't send a fun to another system unless
+    it has exactly the same version of BEAM.
+    In either case, you have made life extremely hard for a wary
+    receiver that wants to inspect the code.
+    If it is the source code, then
+    + it can be (lazily!) compiled to BEAM (or some other VM) 
+    + it can be interpreted
+    + it can be debugged
+    + it can be inspected
+    + we don't have to worry about how the compiler deals with
+      comprehensions -- sadly, the current compiler generates
+      recursive auxiliary functions, which complicates things,
+      and better approaches are possible
+    
+    Accordingly, the binary format for a portable fun would include
+    the source tree, possibly compressed as in Kistler's Juice.
+    The native representation would include a pointer to a block of
+    BEAM code and optionally a pointer to a block of native code,
+    but these would be filled in on first call.
+
+    The possibility of interpretation means that there is a cheap way
+    to implement a prototype of this EEP: always interpret.  This too
+    argues against any change to existing funs; we don't want to slow
+    them down.
+
+
+
+Backwards Compatibility
+
+    "fun!" is currently a syntax error,
+    so no existing code can be affected by that.
+
+    As I read the documentation for erlang:fun_info/[1,2],
+    programmers should always have treated these functions as
+    open-ended.  Nothing promised by the existing manual is
+    removed or altered, only new values provided.
+
+    Any existing program that called
+    erlang:is_portable_function/[1,2]
+    didn't work anyway, there being no such functions.
+    If a module defined is_portable_function/1 or /2,
+    it would not have been allowed in a guard, but would have
+    been allowed elsewhere; such a module could be affected.
+    If the compiler discovers a definition of either function
+    in a module, it should print a warning message, and use only
+    the module's version.
+
+
+
+Reference Implementation
+
+    None.
+
+    Long term, this needs at least two things:
+
+    (A) a fun representation that holds instructions in a binary
+        that is not part of any module, not unlike the classic
+        Interlisp-D implementation, so that such funs can be
+        individually garbage collected.  This is desirable anyway.
+
+    (B) a compilation strategy for comprehensions that, like the
+        classic Pop-2 system, generates in-line loops instead of
+        calls to out-of-line auxiliary functions.  This is
+        desirable anyway; it should be noticeably faster.
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

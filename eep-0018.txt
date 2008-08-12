@@ -1,0 +1,960 @@
+EEP: 18
+Title: JSON bifs
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 28-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    According to the JSON web site [1],
+    "JSON (JavaScript Object Notation) is a lightweight
+    data-interchange format. It is easy for humans to read and write.
+    It is easy for machines to parse and generate."
+
+    JSON is specified by RFC 4627 [2], which defines a Media Type
+    application/json.
+
+    There are JSON libraries for a wide range of languages, so it is a
+    useful format.  CouchDB [6] uses JSON as its storage format and in
+    its RESTful interface; it offers an alternative to Mnesia for some
+    projects, and is accessible from many more languages.  There are
+    already JSON bindings for Erlang, such as the rfc4627 [7] module
+    from LShift, but on the 24th of July 2008, Joe Armstrong suggested
+    that it would be worth having built in functions to convert Erlang
+    terms to and from the JSON format.
+
+    term_to_json        -- convert a term to JSON form
+    json_to_term        -- convert a JSON form to Erlang
+
+
+
+Specification
+
+    Three new types are added to the vocabulary of well known
+    types to be used in edoc.
+
+        @type json_label() = atom() + binary().
+        @type json(L, N) = null + false + true
+                         + N                % some kind of number
+                         + [{}]             % empty "object"
+                         + [{L, json(L,N)}] % non-empty "object"
+                         + [json(L, N)].    % "array"
+                         | [json(L, N)] | tuple({L, json(L, N)}).
+        @type json() = json(json_label(), number()).
+
+    Four new functions are added to the erlang: module.
+
+    erlang:json_to_term(IO_Data) -> json()
+    erlang:json_to_term(IO_Data, Option_List) -> json()
+
+        Types:
+            IO_Data = iodata()
+            Option_List = [Option]
+            Option = {encoding,atom()}
+                   | {float,bool()}
+                   | {label,binary|existing_atom|atom}
+
+        json_to_term(X) is equivalent to json_to_term(X, []).
+
+        The IO_Data implies a sequence of bytes.
+
+        The encoding option says what character encoding to use for
+        converting those bytes to characters.  The default encoding
+        is UTF-8.  All encodings supported elsewhere in Erlang should
+        be supported here.  The JSON specification mentions
+        auto-detection of the encoding as a possibility; the ones
+        that can be detected include UTF-32-BE, UTF-32-LE,
+        UTF-16-BE, UTF-16-LE, UTF-8, and UTF-EBDIC.  The encoding
+        'auto' requests auto-detection.
+
+        The {float,true} option says to convert all JSON numbers to
+        Erlang floats, even if they look like integers.
+        With this option, the result has type json(L, float()).
+
+        The {float,false} option says to convert integers to integers;
+        it is the default.
+        With this option, the result has type json(L, number()).
+
+        The {label,binary} option says to convert all JSON strings
+        to Erlang binaries, even if they are keys in key:value pairs.
+        With this option, the result has type json(binary(), N).
+        This is the default.
+
+        The {label,atom} option says to convert keys to atoms if
+        possible, leaving other strings as binaries.
+        With this option, the result has type json(json_label(), N).
+
+        The {label,existing_atom} option says to convert keys to
+        atoms if the atoms already exist, leaving other keys as
+        binaries.  All other strings remain binaries too.
+        With this option, the result has type json(json_label(), N).
+
+        Other options may be added in the future.
+
+        The mapping from JSON to Erlang is described below in this
+        section.  An argument that is not a well formed IO_Data,
+        or that cannot be decoded, or that when decoded does not
+        follow the rules of JSON syntax, results in a badarg
+        exception.  [It would be nice if there were Erlang-wide
+        conventions for distinguishing these cases.]
+
+    erlang:term_to_json(JSON) -> binary()
+    erlang:term_to_json(JSON, Option_List) -> Binary()
+
+        Types:
+            JSON = json()
+            Option_List = [Option]
+            Option = {encoding,atom()}
+                   | {space,int()}
+                   | space
+                   | {indent,int()}
+                   | indent
+
+        This is a function for producing portable JSON.
+        It is not intended as a means for encoding arbitrary Erlang
+        terms.  Terms that do not fit into the mapping scheme
+        described below in this section result in a badarg exception.
+        The JSON RFC says that "The names within an object SHOULD be
+        unique."  JSON terms that violate this should also result in
+        a badarg exception.
+
+        term_to_json(X) is equivalent to term_to_json(X, []).
+
+        Converting Erlang terms to JSON results in a (logical)
+        character sequence, which is encoded as a sequence of
+        bytes, which is returned as a binary.  The default encoding
+        is UTF-8; this may be overridden by the encoding option.
+        Any encoding supported elsewhere in Erlang should be
+        supported here.
+
+        There are two options for controlling white space.
+        By default, none is generated.
+
+        {space,N}, where N is a non-negative integer, says to
+        add N spaces after each colon and comma.
+        'space' is equivalent to {space,1}.
+        No other space is ever inserted.
+
+        {indent,N}, where N is a non-negative integer, says
+        to add a line break and some indentation after each
+        comma.  The indentation is N spaces for each enclosing
+        [] or {}.  Note that this still does not result in any
+        other spaces being added; in particular ] and } will
+        not appear at the beginning of lines.
+        'indent' is equivalent to {indent,1}.
+
+        Other options may be added in the future.
+
+    Converting JSON to Erlang.
+
+        The keywords null, false, and true are converted to the
+        corresponding Erlang atoms.  No other complete JSON forms
+        are converted to atoms.
+
+        A number is converted to an Erlang float if
+        - it contains a decimal point, or
+        - it contains an exponent, or
+        - it is a negative zero, or
+        - the option {float,true} was passed.
+        A JSON number that looks like an integer other than -0
+        will be converted to an Erlang integer unless {float,true}
+        was provided.
+
+        When occurring as a label in an "object", a string may on
+        explicit request be converted to an Erlang atom, if possible.
+        Otherwise, a string is converted to a UTF-8-encoded binary,
+        whatever the encoding used by the data source.
+        An empty string is converted to an empty binary.
+
+        A sequence is converted to an Erlang list.  The elements have
+        the same order in the list as in the original sequence.
+
+        A non-empty "object" is converted to a list of {Key,Value}
+        pairs suitable for processing with the 'proplists' module.
+        Note that proplists: does not require that keys be atoms.
+        An "object" with no key:value pairs is converted to
+        the list [{}], preserving the invariant that an object
+        is always represented by a non-empty list of tuples.
+        The proplists: module will correctly view [{}] as holding
+        no keys.
+
+        Keys in the JSON form are always strings.  A Key is converted
+        to an Erlang atom if and only if
+        - {label,atom} was specified or
+          {label,existing_atom} was specified and a suitable atom
+          already existed; and
+        - every character in the JSON string can be held in an atom.
+        Currently, only names made of Latin-1 characters can be turned
+        into atoms.  Empty keys, "", are converted to empty atoms ''.
+        Keys are otherwise converted to binaries, using the UTF-8
+        encoding, whatever the original encoding was.
+
+        This means that if you read and convert a JSON term now,
+        and save the binary somewhere, then read and convert it in
+        a later fully-Unicode Erlang, you will find the
+        representations different.  However, the order of the pairs
+        in a JSON "object" has no significance, and an implementation
+        of this specification is free to report them in any order it
+        likes (as given, reversed, sorted, sorted by some hash, you
+        name it).  Within any particular Erlang version, this
+        conversion is a pure function, but different Erlang releases
+        may change the order of pairs, so you cannot expect exactly
+        the same term from release to release anyway.
+
+        See the rationale for reasons why we do not convert to
+        a canonical form, for example by sorting.
+
+        In the spirit of "be generous in what you accept, strict in
+        what you produce", it might be a good idea to accept unquoted
+        labels in the input.  You can't accept just any old junk,
+        but allowing Javascript [8] IdentifierNames would make sense.
+
+        IdentifierName = IdentifierStart IdentifierPart*.
+        IdentifierStart = UnicodeLetter | '$' | '_' |
+                          '\u' HexDigit*4
+        IdentifierPart = IdentifierStart | UnicodeCombiningMark |
+                         UnicodeDigit | UnicodeConnectorPunctuation
+
+        There are apparently JSON generators out there that do this,
+        so it would add value, but it is not _required_.
+
+    Converting Erlang to JSON.
+
+        The atoms null, false, and true are converted to the
+        corresponding JSON keywords.  No other Erlang atoms are
+        allowed.
+
+        An Erlang integer is converted to a JSON integer.
+        An Erlang float is converted to a JSON float, as precisely
+        as practical.  An Erlang float which has an integral value
+        is written in such a way that it will read back as a float;
+        suitable methods include suffixing ".0" or "e0".
+
+        An Erlang binary that is the UTF-8 representation of some
+        Unicode string is converted to a string.  No other binaries
+        are allowed.
+
+        An Erlang list all of whose elements are tuples is converted
+        to a JSON "object".  If the list is [{}] it is converted to
+        "{}", otherwise all the tuples must have two elements and
+        the first must be an atom or binary; other tuples are not
+        allowed.  For each {Key,Value} pair, the key must be an atom
+        or a binary that is the  UTF-8 representation of some Unicode
+        string; the key is converted to a JSON string.  The value must
+        be a JSON term.  The order of the key:value pairs in the
+        output is the same as the order of the {Key,Value} pairs 
+        in the list.  A list with two equivalent keys is not allowed.
+        Two binaries, or two atoms, are equivalent iff they are equal.
+        An atom and a binary are equivalent if they would convert to
+        the same JSON string.
+
+        Erlang tuples are not allowed except as elements of lists
+        that will be converted to JSON "objects".
+        No other tuples are allowed.
+
+        An Erlang proper list whose elements are not tuples is
+        converted to a JSON sequence by converting its elements in
+        natural order.
+
+        An improper list is not allowed.
+
+        Other Erlang terms are not allowed.  If you want to "tunnel"
+        other Erlang terms through JSON, fine, but it is entirely up
+        to you to do whatever conversion you want.
+
+
+
+Motivation
+
+    As Joe Armstrong put it in his message,
+    "JSON seems to be ubiquitous".
+    It should not only be supported, it should be supported
+    simply, efficiently, and reliably.
+
+    As noted above, http://www.ietf.org/rfc/rfc4627.txt
+    defines an application/json Media Type that Erlang
+    should be able to handle "out of the box".
+
+
+
+Rationale
+
+    The very first question is whether the interface should be a
+    "value" interface (where a chunk of data is converted to an
+    Erlang term in one go) or an "event stream" interface, like
+    the classical ESIS interface offered by SGML parsers, for
+    some arcane reason known as SAX these days.
+
+    There is room in the world for both kinds of interface.
+    This one is a "value" interface, which is best suited to
+    modest quantities of JSON data, less than a few megabytes say,
+    where the latency of waiting for the whole form before
+    processing any of it is not a problem.  Someone else might
+    want to write an "event stream" EEP.
+
+    Related to this issue, a JSON text must be an array or an object,
+    not, for example, a bare number.  Or so says the JSON RFC.  I do
+    not know whether all JSON libraries enforce this.  Since a JSON
+    text must be [something] or {something}, JSON texts are self-
+    delimiting, and it makes sense to consume them one at a time from
+    a stream.  Should that be part of this interface?  Maybe, maybe
+    not.  I note that you can separate parsing
+        - skip leading white space
+        - check for '[' or '{'
+        - keep on accumulating characters until you find a
+          matching ']' or '}', ignoring characters inside "".
+    from conversion.  So I have separated them.  This proposal only
+    addresses conversion.  An extension should address parsing.  It
+    might work better to have that as part of an event stream EEP.
+
+    Let's consider conversion then.  Round trip conversion fidelity
+    (X -> Y -> X should be an identity function) is always nice.  Can
+    we have it?
+
+    JSON has
+        - null
+        - false
+        - true
+        - number (integers, floats, and ratios are not distinguished)
+        - string
+        - sequence (called array)
+        - record (called object)
+    Erlang has
+        - atom
+        - number (integers and floats are distinguished)
+        - binary
+        - list
+        - tuple
+        - pid
+        - port
+        - reference
+        - fun
+
+    More precisely, JSON syntax DOES make integers distinguishable
+    from floats; it is Javascript (when JSON is used with Javascript)
+    that fails to distinguish them.  Since we would like to use JSON
+    to exchange data between Erlang, Common Lisp, Scheme, Smalltalk,
+    and above all Python, all of which have such a distinction, it is
+    fortunate that JSON syntax and the RFC allow the distinction.
+
+    Clearly, Erlang->JSON->Erlang is going to be tricky.  To take
+    just one minor point, neither www.json.org nor RFC 4627 makes
+    an promises whatever about the range of numbers that can be
+    passed through JSON.  There isn't even any minimum range.  It
+    seems as though a JSON implementation could reject all numbers
+    other than 0 as too large and still conform!  This is stupid.
+    We can PROBABLY rely on IEEE doubles; we almost certainly cannot
+    expect to get large integers through JSON.
+
+    Converting pids, ports, and references to textual form using
+    pid_to_list/1, erlang:port_to_list/1, and erlang:ref_to_list/1
+    is possible.  A built in function can certainly convert back
+    from textual form if we want it to.  The problem is telling these
+    strings from other strings:  when is "<0.43.0>" a pid and when is
+    it a string?  As for funs, let's not go there.
+
+    Basically, converting Erlang terms to JSON so that they can be
+    reconstructed as the same (or very similar) Erlang terms would
+    involve something like this:
+
+        atom -> string
+        number -> number
+        binary -> {"type":"binary", "data":[<bytes>]}
+        list   -> <list>, if it's a proper list
+        list   -> {"type":"dotted", "data":<list>, "end":<last cdr>}
+        tuple  -> {"type":"tuple",  "data":<tuple as list>}
+        pid    -> {"type":"pid",    "data":<pid as string>}
+        port   -> {"type":"port",   "data":<port as string>}
+        ref    -> {"type":"ref",    "data":<ref as string>}
+        fun    -> {"module":<m>, "name":<n>, "arity":<a>}
+        fun    -> we're pushing things a bit for anything else.
+
+    This is not part of the specification because I am not proposing
+    JSON as a representation for arbitrary Erlang data.  I am making
+    the point that we COULD represent (most) Erlang data in JSON if
+    we really wanted to, but it is not an easy or natural fit.  For
+    that we have Erlang binary format and we have UBF.  To repeat,
+    we have no reason to believe that a JSON->JSON copier that works
+    by decoding JSON to an internal form and recoding it for output
+    will preserve Erlang terms, even encoded like this.
+
+    No, the point of JSON support in Erlang is to let Erlang programs
+    deal with the JSON data that other people are sending around the
+    net, and to send JSON data to other programs (like scripts in Web
+    browsers) that are expecting plain old JSON.  The round trip
+    conversion we need to care about is JSON -> Erlang -> JSON.
+
+    Here too we run into problems.  The obvious way to represent
+    {"a":A, "b":B} in Erlang is [{'a',A},{'b',B}], and the obvious
+    way to represent a string is as a list of characters.  But in
+    JSON, an empty list, an empty "object", and an empty string are
+    all clearly distinct, so must be translated to different Erlang
+    terms.  Bearing this in mind, here's a first cut at mapping
+    JSON to Erlang:
+
+        - null => the atom 'null'
+        - false => the atom 'false'
+        - true => the atom 'true'
+        - number => a float if there is a decimal point or exponent,
+                 => the float -0.0 if it is a minus sign followed by
+                     one or more zeros, with or without a decimal point
+                     or exponent
+                 => an integer otherwise
+        - string => a UTF-8-encoded binary
+        - sequence => a list
+        - object => a list of {Key,Value} pairs
+                 => the empty tuple {} for an empty {} object
+
+    Since Erlang does not currently allow the full range of
+    Unicode characters in an atom, a Key should be an atom if
+    each character of a label fits in Latin 1, or a binary if
+    it does not.
+
+    Let's examine "objects" a little more closely.  Erlang
+    programmers are used to working with lists of {Key,Value}
+    pairs.  The standard library even include orddict, which
+    works with just such lists (although they must be sorted).
+    However, there is something distasteful about having empty
+    objects convert to empty tuples, but non-empty objects to
+    empty lists, and there is also something distasteful about
+    lists converting to sequence or objects depending on what
+    is inside them.  What is distasteful here has something to
+    do with TYPES.  Erlang doesn't have static types, but that
+    does not mean that types are not useful as a design tool,
+    or that something resembling type consistency is not useful
+    to people.  The fact that Erlang tuples happen to use curly
+    braces is just icing on the cake.  The first draft of this
+    EEP used lists; that was entirely R.A.O'K's own work.  It
+    was then brought to his attention that Joe Armstrong thought
+    converting "objects" to tuples was the right thing to do.
+    So the next draft did that.  Then other alternatives were
+    brought up.  I'm currently aware of
+
+    - Objects are tuples
+        A. {{K1,V1}, ..., {Kn,Vn}}.
+           This is the result of list_to_tuple/1 applied to a      
+           proplist.  There are no library functions to deal
+           with such things, but they are unambiguous and
+           relatively space-efficient.
+        B. {object,[{K1,V1}, ..., {Kn,Vn}]}
+           This is a proplist wrapped in a tuple purely to
+           distinguish it from other lists.  This offers
+           simple type testing (objects are tuples) and simple
+           field processing (they contain proplists).
+           There seems to be no consensus for what the tag
+           should be, 'obj' (gratuitous abbreviation), 'json'
+           (but even the numbers binaries and lists are JSON),
+           'object' seems to be least objectionable.
+        C. {[{K1,V1},...,{Kn,Vn}]}
+           Like B, but there isn't any need for a tag.
+      A and B are due to Joe Armstrong; I cannot recall who
+      thought of C.  It has recently had supporters.
+
+    - Objects are lists
+        D. Empty objects are {}.
+           This was my original proposal.  Simple but non-uniform
+           and clumsy.
+        E. Empty objects are [{}].
+           This came from the Erlang mailing list; I have forgotten
+           who proposed it.  It's brilliant: objects are always
+           lists of tuples.
+        F. Empty objects are 'empty'.
+           Like A but a tiny fraction more space-efficient.
+
+    We can demonstrate handling "objects" in each of these forms:
+
+        json:is_object(X) -> is_tuple(X).          % A
+
+        json:is_object({object,X}) -> is_list(X).  % B
+
+        json:is_object({X}) -> is_list(X).         % C
+
+        json:is_object({}) -> true;                % D
+        json:is_object([{_,_}|_]) -> true;
+        json:is_object(_) -> false.   
+
+        json:is_object([X|_]) -> is_tuple(X).      % E
+
+        json:is_object(empty) -> true;             % F
+        json:is_object([{_,_}|_]) -> true;
+        json:is_object(_) -> false.   
+
+    Of these, A, B, C, and E can easily be used in clause heads,
+    and E is the only one that is easy to use with proplist.
+    After much scratching of the head and floundering around,
+    E does it.
+
+    We might consider adding an 'object' option:
+
+        {object,tuple}    representation A
+        {object,pair}     representation B.
+        {object,wrap}     representation C.
+        {object,list}     representation E.
+
+    For conversion from Erlang to JSON,
+
+        {T1,...,Tn}       0 or more tuples
+        {object,L}        size 2, 1st element atom, 2nd list
+        {L}               size 1, only element a list
+
+    are all recognisable, so term_to_json/[1,2] could accept
+    all of them without requiring an option.
+
+    There is a long term reason why we want some such option.
+    Both lists and tuples are just WRONG.  The right data structure to
+    represent JSON "objects" is the one that I call "frames" and Joe
+    Armstrong calls "proper structs".  At some point in the future we
+    will definitely want to have {object,frame} as a possibility.
+
+    Suppose you are receiving JSON data from a source that does
+    not distinguish between integers and floating point numbers?
+    Perl, for example, or even more obviously, Javascript itself.
+    In that case some floating point numbers may have been written
+    in integer style more or less accidentally.  In such a case, you
+    may want all the numbers in a JSON form converted to Erlang
+    floats.  {float,true} was provided for that purpose.
+
+    The corresponding mapping from Erlang to JSON is
+
+        - atom => itself if it is null, false, or true
+               => error otherwise
+        - number => itself; use full precision for floats,
+                    and always include a decimal point or exponent
+                    in a float
+        - binary => if the binary is a well formed UTF-8 encoding
+                    of some string, that string
+                 => error otherwise
+        - tuple => if all elements are {Key,Value} pairs with
+                   non-equivalent keys, then a JSON "object",
+                => error otherwise
+        - list => if it is proper, itself as a sequence
+               => error otherwise
+        - otherwise, an error
+
+    There is an issue here with keys.  The RFC says that "The names
+    within an object SHOULD be unique."  In the spirit of "be
+    generous in what you accept, strict in what you generate", we
+    really ought to check that.  The only time term_to_json/[1,2]
+    terminate successfully should be when the output is absolutely
+    perfect JSON.  I did toy with the idea of an option to allow
+    duplicate labels, but if I want to send such non-standard data,
+    who can I send it to?  Another Erlang program?  Then I would be
+    better to use external binary format.  So the only options now
+    allowed are ones to affect white space.  One might add an
+    option later to specify the order of key:value pairs somehow,
+    but options that do not affect the semantics are appropriate.
+
+    On second thoughts, look at the JSON-RPC 1.1 draft.
+    It says
+       "Client implementations SHOULD strive to order the members of
+        the Procedure Call object such that the server is able to
+        employ a streaming strategy to process the contents.  At the
+        very least, a client SHOULD ensure that the version member
+        appears first and the params member last."
+    Reference [4], section 6.2.4 "Member Sequence".
+    This means that for conformity with JSON-RPC,
+        term_to_json([{version,<<"1.1">>},
+                      {method, <<"sum">>},
+                      {params, [17,25]}])
+    should not re-order the pairs.  Hence the current specification
+    says the order is preserved and does not provide any means for
+    re-ordering.  If you want a standard order, program it outside.
+
+    How should the "duplicate label" error be reported?  There are two
+    ways to report such errors in Erlang:  raise 'badarg' exceptions,
+    or return either {ok,Result} or {error,Reason} answers.  I'm
+    really not at all sure what to do here.  I ended up with 'raise
+    badarg' because that's what things like binary_to_term/1 do.
+   
+    At the moment, I specify that the Erlang terms use UTF-8 and only
+    UTF-8.  This is by far the simplest possibility.  However, we
+    could certainly add
+        {internal,Encoding}
+    options to say what Encoding to use or assume for binaries.  The
+    time to add that, I think, is when there is a demonstrated need.
+
+    There are five "round trip" issues left:
+
+    - all information about white space is lost.
+      This is not a problem, because it has no significance.
+
+    - decimal->binary->decimal conversion of floating point numbers
+      may introduce error unless techniques like those described in    
+      the Scheme report are used to do these conversions with high
+      accuracy.  This is a general problem for Erlang, and a general
+      problem for JSON.
+
+    - there is another JSON library for Erlang that always converts
+      integers outside the 32-bit range to floating point.  This seems
+      like a bad idea.  There are languages (Scheme, Common Lisp,
+      SWI Prolog, Smalltalk) with JSON libraries that have bignums.
+      Why put an arbitrary restriction on our ability to communication
+      with them?  Any JSON implementation that is unable to cope with
+      large integers as integers is (or should be) perfectly able to
+      convert such numbers to floating-point for itself.  It seems
+      specially silly to do this when you consider that the program on
+      the other end might itself be in Erlang.  So we expect that if T
+      is of type json(binary(),integer()) then
+
+        json_to_term(term_to_json(T), [{label,binary}])
+
+      should be identical to T, up to re-ordering of attribute pairs.
+
+    - conversion of a string to a binary and then a binary to a
+      string will not always yield the same representation, but
+      what you get will represent the same string.  Example,
+      "\0041" will read as <<65>> which will display as "A".
+
+    - Technically speaking the Unicode "surrogates" are not
+      characters.  The RFC allows characters outside the Basic
+      Multilingual Plane to be written as UTF-8 sequences, or
+      to be written as 12-character \uHIGH\uLOWW surrogate pair
+      escapes.  Something with a bare \uHIGH or \uLOWW surrogate
+      code point is not, technically speaking, a legal Unicode
+      string, so a UTF-8 sequence for such a code point should
+      not appear.  A \uHIGH or \uLOWW escape sequence on its own
+      should not appear either; it would be just as much of a
+      syntax error as a byte with value 255 in a UTF-8 sequence.
+      We actually have two problems:
+
+        (a) Some languages may be sloppy and may allow singleton
+            surrogates inside strings.  Should Erlang be equally
+            sloppy?  Should this just be allowed?
+
+        (b) Some languages (and yes, I do mean Java) don't really
+            do UTF-8, but instead first break a sequence of Unicode
+            characters into 16-bit chunks (UTF-16) and then encode
+            the chunks as UTF-8, producing what is quite definitely
+            illegal UTF-8.  Since there is a lot of Java code in the
+            world, how do we deal with this?
+
+            Be generous in what you accept:  the 'utf8' decoder
+            should quietly accept "UTF-Java", converting
+            separately encoded surrogates to a single numeric
+            code, and converting singleton surrogates _as if_ they
+            were characters.
+
+            Be strict in what you generate:  never generate
+            UTF-Java when the requested encoding is 'utf8';
+            have a separate 'java' encoding that can be requested
+            instead.
+
+    Hynek Vychodil is vehement that the only acceptable way to handle
+    JSON labels is as binaries.  His argument against {label,atom} is
+    sound:  as noted above, that option is only usable within a trust
+    boundary.  His argument against {label,existing_atom} is that if
+    you convert a JSON form at one time in one node, and then store
+    the Erlang term in a file or send it across a wire or in any
+    other way make it available at another node or another time,
+    then it won't match the same JSON form converted at that time in
+    that node.  This is true, but there are plenty of other round
+    trip issues as well.  Data converted using {float,true} will not
+    match data converted using {float,false}.  The handling of
+    duplicate labels may vary.  The order of {key,value} pairs is
+    particularly likely to vary.  For all programming languages and
+    libraries, if you want to move JSON data around in time or
+    space, the _only_ reliable way to do that is to move it _as_
+    (possibly compressed) JSON data, not as something else.  You
+    can expect a JSON form read at one time/place to be equivalent
+    to the same form read at another time/place; you cannot expect
+    it to be identical.  Any code that does is essentially buggy,
+    whether {label,existing_atom} is used or not.  Here is an
+    example that shows that the problem is ineradicable.
+
+    Suppose we have the JSON form
+    "[0.123456789123456789123456789123456]".
+    Two Erlang nodes on different machines read this and
+    convert it to an Erlang term.  One of them sends its term to
+    the other, which compares them.  To its astonishment, they
+    are not identical!  Why?  Well, it could be that they use
+    different floating-point precisions.  On one of Erlang's main
+    platforms, 128-bit floats are supported.  (The example needs
+    128 bits.)  On its other main platform, 80-bit floats are
+    supported.  (In neither case am I saying that Erlang does,
+    only that the hardware does.)  Indeed, modern versions of the
+    second platform usually work with 64-bit floats.  Let us
+    suppose that they both stick with 64-bit floats instead.
+    What if one of the systems is an IBM/370 with its non-IEEE
+    doubles?  So suppose they are both using IEEE 64-bit floats.
+    They will use different C libraries to do the initial
+    decimal-to-binary conversion, so the number may be rounded
+    differently.  And if one is Windows and another is Linux or
+    Solaris, they WILL use different libraries.  Should Erlang
+    use its own code (which might not be a bad idea), we would
+    still have trouble talking to machines with non-IEEE doubles,
+    which are still in use.  Even Java, which originally wanted
+    to have bit-identical results everywhere, eventually retreated.
+
+    There is one important issue for JSON generation, and that is
+    what white space should be generated.  Since JSON is supposed to
+    be "human readable", it would be nice if it could be indented,
+    and if it could be kept to a reasonable line width.  However,
+    appearances to the contrary, JSON has to be regard as a binary
+    format.  There is no way to insert line breaks inside strings.
+    Javascript doesn't have any analogue of C's <backslash><newline>
+    continuation; it can always join the pieces with '+'.  JSON has
+    inherited the lack (no line continuation) but not the remedy
+    (you may not use '+' in JSON).  So a JSON form containing a
+    1000-character string cannot be fitted into 80-column lines;
+    it just cannot be done.
+
+    The main thing I have not accounted for is the {label,_}.
+    option of json_to_term/2.  For normal Erlang purposes, it is
+    much nicer (and somewhat more efficient) to deal with
+
+        [{name,<<"fred">>},{female,false},{age,65}]
+
+    than with
+
+        [{<<"name">>,<<"fred">>},{<<"female">>,false},{<<"age">>,65}]
+
+    If you are communicating with a trusted source that deals with
+    a known small number of labels, fine.  There are limits on the
+    number of atoms Erlang can deal with.  A small test program
+    that looped creating atoms and putting them into a list ticked
+    over happily until shortly after its millionth atom, and then
+    hung there burning cycles apparently getting nowhere.  Also,
+    the atom table is shared by all processes on an Erlang node,
+    so garbage collecting it is not as cheap as it might be.  As
+    a system integrity measure, therefore, it is useful to have a
+    mode of operation in which json_to_term never creates atoms.
+    But Erlang offers a third possibility:  there is a built-in
+    list_to_existing_atom/1 function that returns an atom only if
+    that atom already exists.  Otherwise it raises an exception.
+    So there are three cases:
+
+        {label,binary}
+
+            Always convert labels to binaries.
+            This is always safe and always clumsy.
+            Since <<"xxx">> syntax exists in Erlang,
+            it isn't _that_ clumsy.  It is uniform,
+            and stable, in that it does not depend
+            on whether Erlang atoms support Unicode or
+            not, or what other modules have been loaded.
+
+        {label,atom}
+
+            Always convert labels to atoms if all their
+            characters are allowed in atoms, leave them
+            as binaries otherwise.
+
+            This is more convenient for Erlang programming.
+            However, it is only really usable with a partner
+            that you trust.  Since much communication takes
+            place within trust boundaries, it definitely has
+            a place.  If this were not so, term_to_binary/1
+            would be of no use!
+
+        {label,existing_atom}
+
+            Convert labels that match the names of existing
+            atoms to those atoms, leave all others as binaries.
+            If a module mentions an atom, and goes looking for
+            that atom as a key, it will find it.  This is safe
+            _and_ convenient.  The only real issue with it is
+            that the same JSON term converted at different times
+            (in the same Erlang node) may be converted differently.
+            This usually won't matter.
+
+    In previous drafts I selected 'existing_atom' as the default,
+    because that's the option I like best.  It's the one that would
+    most simplify the code that I would like to write.  However, one
+    must also consider conversion issues.  Some well considered
+    existing JSON libraries for Erlang always use binaries.
+
+    There is no {string,XXX} option.  That's because I see the
+    strings in JSON as "payload", as unpredictable data that are
+    being transmitted, that one does not _expect_ to match against.
+    This is in marked contrast with labels, which are "structure"
+    rather than data, and which one expects to match against a lot.
+    I did briefly consider a {string,list|binary} option, but these
+    days Erlang is so good at matching binaries that there didn't
+    seem to be much point.
+
+    This raises a general issue about binaries.  One of the reasons
+    for liking atoms as labels is that atoms are stored uniquely,
+    and binaries are not.  This extends to term_to_binary(), which
+    compresses repeated references to identical atoms, but not
+    repeated references to equal binaries.  There is no reason that
+    a C implementation of json_to_term/[1,2] could not keep track
+    of which labels have been seen and share references to repeated
+    ones.  For example,
+        [{"name":"root","command":"java","cpu":75.7},
+         {"name":"ok","command":"iropt","cpu":1.5}
+        ]
+    -- extracted from a run of the 'top' command showing that my
+    C compilation was getting a tiny fraction of the machine,
+    while some Java program run by root was getting the lion's share --
+    would convert to Erlang as the equivalent of
+        N = <<"name">>,
+        M = <<"command">>,
+        P = <<"cpu">>,
+        [[{N,<<"root">>},{M,<<"java">>}, {P,75.7}],
+         [{N,<<"ok">>},  {M,<<"iropt">>},{P, 1.5}]
+        ]
+    getting much of the space saving that atoms would use.  There is
+    of course no way for a pure Erlang program to detect whether such
+    sharing is happening or not.  It would be nice if
+        term_to_binary(json_to_term(JSON))
+    preserved such sharing.
+
+    Another issue that has been raised concerns encoding.  Some people
+    have said that they would like (a) to allow input encodings other
+    than UTF-8, (b) to have strings reported in their original
+    encoding, rather than UTF-8, so that (c) strings can be slices of
+    the original binary.  What does the JSON specification actually
+    say?  Section 3, Encoding:
+
+       "JSON text SHALL be encoded in Unicode.
+        The default encoding is UTF-8."
+
+    This is not quite as clear as it might be.  There is explicit
+    mention of UTF-32 and UTF-16 (both of them in big- and little-
+    endian forms).  But is SCSU "Unicode"?  Is BOCU?  How about
+    UTF-EBCDIC [5]?  That's right, there is a legal way to encode
+    something in "Unicode" in which the JSON special characters
+    []{},:\" do not have their ASCII values.  There does not seem
+    to be any reason to suppose that this is forbidden, and on an
+    IBM mainframe I would expect it to be useful.  Until the day
+    someone ports Erlang to a z/Series machine, this is mainly of
+    academic interest, but we don't want to paint ourselves into
+    any corners.
+
+    Suppose we did represent strings in their native encoding.
+    What then?  First, a string that contained an escape sequence
+    of any kind could not be held as a slice of the source anyway.
+    Nor could a string that spanned two or more chunks of the
+    IO_Data input.  The really big problem is that there would be
+    no indication of what the encoding actually was, so that we
+    would end up regarding logically equal strings from different
+    sources as unequal and logically unequal strings as equal.
+
+    I do not want to forbid strings in the result being slices of
+    an original binary.  In the common case when the input is
+    UTF-8 and the string does not contain any escapes, so that it
+    _can_ be done, an implementation should definitely be free to
+    exploit that.  As this EEP currently stands, it is.  What we
+    cannot do is to _require_ such sharing, because it generally
+    won't work.
+
+    It has been suggested to me that it might be better for the
+    result of term_to_json/[1,2] to be iodata() rather than a
+    binary().  Anything that would have accepted iodata() will be
+    happy with a binary(), so the question is whether it is better
+    for the implementation, whether perhaps there are chunks of stuff
+    that have to be copied using a binary() but can be shared using
+    iodata().  Thanks to the encoding issue, I don't really think so.
+    This might be a good time to point out why the encoding is done
+    here rather than somewhere else.  If you know that you are
+    generating stuff that will be encoded into character set X, then
+    you can avoid generating characters that are not in that
+    character set.  You can generate \u sequences instead.  Of course
+    JSON itself requires UTF-8, but what if you are going to send it
+    through some other transport?  With {encoding,ascii} you are out
+    of trouble all the way.  So for now I am sticking with binary().
+
+    The final issue is whether these functions should go in the
+    erlang: module or in some other module (perhaps called json:).
+    
+    - If another module, then there is no barrier to adding other
+      functions.  For example, we might offer functions to test
+      whether a term is a JSON term, or an IO_Data represents a JSON
+      term, or alternative functions that present results in some
+      canonical form.
+
+    - If another module, then someone looking for a JSON module might
+      find one.
+
+    - If another module, then this interface can easily be prototyped
+      without any modification to the core Erlang system.
+
+    - If another module, then someone who doesn't need this feature
+      need not load it.
+
+    Conversely,
+
+    - If another module, then it is too easy to bloat the interface.
+      We don't _need_ such testing functions, as we can always catch
+      the badarg exception from the existing ones.  We don't _need_
+      extra canonicalising functions, because we can add options to
+      the existing ones.  Something that subtly encourages us to
+      keep the number of functions down is a Good Thing.
+
+    - Every Erlang programmer ought to be familiar with the erlang:
+      module, and when looking for any feature, ought to start by
+      looking there.
+
+    - There are JSON implementations in Erlang already; we know what
+      it is like to use such a thing, and we only need to settle the
+      fine details of the implementation.  We know that it can be
+      implemented.  Now we want something that is always there and
+      always the same and is as efficient as practical.
+
+    - In particular, we know that the feature is useful, and we know
+      that in applications where it is used, it will be used often,
+      so we want it to go about as fast as term_to_binary/1 and
+      binary_to_term/1.  So we'd really like it to be implemented in
+      C, ideally inside the emulator.  Erlang does not make dynamic
+      loading of foreign code modules easy.
+
+    It's a delicate balance.  On the whole, I still think that putting
+    these functions in erlang: is a good idea, but more reasons on
+    both sides would be useful.
+
+
+
+
+Backwards Compatibility
+
+    There are no term_to_json/N or json_to_term/N functions in
+    the erlang: module now, so adding them should not break
+    anything.  These functions will NOT be automatically imported;
+    it will be necessary to use an explicit erlang: prefix.  So
+    any existing code that uses these function names won't notice
+    any change.
+
+
+
+Reference Implementation
+
+    None.
+
+
+
+References
+    
+    [1] The JSON web site, http://www.json.org/
+    [2] The JSON RFC, http://www.ietf.org/rfc/rfc4627.txt
+    [3] The JSON RPC web site, http://www.json-rpc.org/
+    [4] The JSON RPC 1.1 draft specification,
+        http://json-rpc.org/wd/JSON-RPC-1-1-WD-20060807.html
+    [5] Uniode technical report #16, UTF-EBCDIC,
+        http://unicode.org/reports/tr16/
+    [6] CouchDB, http://incubator.apache.org/couchdb/
+        and http://wiki.apache.org/couchdb/
+    [7] rfc4627 module for Erlang from LShift,
+        www.lshift.net/blog/2007/02/17/json-and-json-rpc-for-erlang
+    [8] ECMA stanard 262, ECMAScript.
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

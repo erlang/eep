@@ -1,0 +1,172 @@
+EEP: 21
+Title: Optional trailing commas for lists and tuples
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 08-Aug-2008
+Post-History:
+
+
+
+Abstract
+
+    Allow an extra comma at the end of a list or tuple.
+    Darren New proposed this change; Richard O'Keefe, who doesn't
+    like it very much, wrote it up as an EEP.
+
+
+
+Specification
+
+    A list that would have ended with ",X]" for some term X
+    may instead end with ",X,]".
+    A tuple that would have ended with ",X}" for some term X
+    may instead end with ",X,}".
+    The rule for tuples also applies to records and -record
+    declarations.
+
+
+
+Motivation
+
+    About 5,000 lines of the Erlang/OTP sources begin with a right
+    square bracket or right curly brace.  For example, -record
+    declarations are commonly laid out as
+
+	-record(foo, {
+	    field_1 = default_1,
+	    ...
+	    field_n = default_n
+	 }).
+
+    e.g.,
+
+	-record(hostent, {
+		 h_name,
+		 h_aliases = [],
+		 h_addrtype,
+		 h_length,
+		 h_addr_list = []
+		}).
+
+    and record creation expressions are often laid out similarly, e.g.,
+
+    make_hostent(Name, Addrs, Aliases, ?S_A) ->
+	#hostent {
+		  h_name      = Name,
+		  h_addrtype  = inet,
+		  h_length    = 4,
+		  h_addr_list = Addrs,
+		  h_aliases   = Aliases
+		 };
+
+    Adding entries to such lists (in the informal sense of "list"),
+    removing entries, and reordering entries would be simpler if they
+    were all punctuated the same way.  Lists (in the Erlang sense of
+    "list") of options are also often laid out like this.
+
+    C, C++, Java, and Javascript allow a trailing comma in
+    initial value lists.  Python allows trailing commas in lists and
+    dictionaries.  Python in particular is evidence that a programming
+    language can support this feature without charges of "C envy" or
+    of extreme ugliness.
+
+
+
+Rationale
+
+    I don't actually feel any need for this proposal; I believe that
+    the answer is better tool support.  However, many people are
+    wedded to their tools, even more than their programming languages.
+    Darren New is not the only one to have asked for it, and with
+    about 1 SLOC in 110 of the Erlang/OTP sources reflecting a list or
+    tuple where this feature could have been used, it's very much a
+    low cost high public appreciation feature.
+
+    I wrote that last sentence before working on the parser to make it
+    accept this "feature".  There are 115 lines of plain diffs.  I
+    could have made this change to the Prolog parser in 10 minutes,
+    but then the Prolog parser has the enormous advantage of NOT being
+    written using an LR parser generator like Yecc.  Still, now that I
+    *have* hacked on the parser, the cost to everyone *else* is low.
+
+    The specification was carefully worded.  Commas are NOT allowed in
+    empty lists or tuples, nor in list or tuple comprehensions.  They
+    are only allowed after a final element, so [1|L,] is also not
+    allowed.  Nor are trailing commas allowed inside argument lists,
+    only in [] and {}.  They are, however, allowed in tuple and
+    record types.
+
+    This is very similar to the "optional semicolons" EEP (which was
+    FAR simpler to implement).  The heart and soul of that EEP is the
+    desire to make semicolons and commas look DIFFERENT; for this
+    reason it is important NOT to allow optional trailing semicolons.
+    If semicolons may trail, commas must not.
+    If commas may trail, semicolons must not.
+    It is also important NOT to approach the "consistent punctuation
+    for list elements" problem by allowing optional leading commas.
+    If semicolons may lead, commas must not.
+    If commas may lead, semicolons must not.
+    Since trailing commas are established practice in C, C++, Java,
+    ECMAScript, Python, &c, commas trail, semicolons lead.
+
+    I repeat that this is not my idea.  I've just written up the EEP
+    and figured out how to implement it.  With nearly 1% of the SLOC
+    in the Erlang/OTP system being cases where people might well have
+    had reason to add a trailing comma, had it been legal, it seemed
+    worth while finding out whether it would be practical.
+
+
+
+Backwards Compatibility
+
+    All existing Erlang code remains acceptable with unchanged
+    semantics.  The commas are dealt with entirely in the parser;
+    other language manipulation tools never know that they were
+    there, so work perfectly with code using them.
+
+
+
+Reference Implementation
+
+    The auxiliary file eep-0021-1.diff
+    is a patch file to be applied to erl_parse.yrl.
+
+    You would think that all we'd need to do would be to change
+
+	... ']'                    ... '}'
+    to	
+        ... ',' ']'                ... ',' '}'
+
+    in several places.  You would be wrong.  With a different grammar,
+    maybe.  With the current grammar, this was an uncommonly tricky
+    change requiring surgery in all sorts of places.  The result gets
+    through Yecc with no complaints other than the two shift/reduce
+    complaints that are expected (and have nothing to do with this
+    change).
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

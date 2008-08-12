@@ -1,0 +1,293 @@
+EEP: 17
+Title: Fix andalso and orelse
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 23-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Erlang 5.1 added the ability to use 'andalso', 'orelse',
+    'and', and 'or' in guards.  However, the semantics for
+    'andalso' and 'orelse' differs from that in other related
+    languages, causing confusion and inefficiency.
+
+    I propose making 'andalso' and 'orelse' work like Lisp
+    AND and OR respectively.
+
+
+
+Specification
+
+    Currently, (E1 andalso E2) as an expression acts like
+
+        case E1
+         of false -> false
+          ; true  -> case E2 
+                       of false -> false
+                        ; true  -> true
+                     end
+        end
+
+    except that in my tests the former raises {badarg,NonBool}
+    exceptions and the latter raises {case_clause,NonBool} ones.
+
+    This should be changed to
+
+        case E1
+          of false -> false
+           ; true   -> E2
+        end.
+
+    Currently, (E1 orelse E2) as an expression acts like
+
+        case E1
+          of true  -> true
+           ; false -> case E2
+                        of true  -> true
+                         ; false -> false
+                      end
+        end
+
+    except that in my tests the former raises {badarg,NonBool}
+    exceptions and the latter raises {case_clause,NonBool} ones.
+
+    This should be changed to
+
+        case E1
+          of true  -> true
+           ; false -> E2
+        end
+
+    There is apparently a folklore belief that using 'andalso' (or
+    'orelse') in a guard will somehow give you better code than using
+    ',' (or ';').  On the contrary, you will get rather worse code.
+    See "Motivation" for an example.  This should change.
+
+    guard ::= gconj {';' gconj}*
+    gconj ::= gtest {',' gtest}*
+    gtest ::= '(' guard ')' | ...
+
+    First, we allow ',' and ';' to nest, using parentheses.
+    Second, we rule that as outer operators in a guard, the
+    only difference between ',' and 'andalso' is precedence,
+    and the only difference between ';' and 'orelse' is also
+    precedence.  In a guard test like
+        is_atom(X andalso Y)
+    the andalso cannot be replaced by ',', but whenever one
+    COULD be replaced by the other, they should have the same
+    effect.
+
+
+Motivation
+
+    Cultural consistency.
+
+    Common Lisp:
+
+        (defun member-p (X Xs)
+          (and (consp Xs)
+               (or (equal X (first Xs))
+                   (member-p X (rest Xs)))))
+
+    Scheme:
+
+        (define (member? X Xs)
+          (and (pair? Xs)
+               (or (equal? X (car Xs))
+                   (member? X (cdr Xs)))))
+
+    Standard ML:
+
+        fun is_member(x, xs) =
+            not (null xs) andalso (
+            x = hd xs orelse is_member(x, tl xs))
+
+    Haskell:
+
+        x `is_member_of` xs =
+           not (null xs) && (x == head xs || x `is_member_of` tail xs)
+
+    Dylan:
+
+        I don't know Dylan syntax well enough to finish this
+        example, but I do know that '&' and '|' in Dylan are exactly
+        like AND and OR in Common Lisp except for syntax.  (They are
+        documented as allowing the right operand to return anything,
+        including multiple values.)
+
+    Python:
+
+        def is_member(x, xs):
+            n = len(xs)
+            return n > 0 and (x == xs[0] or is_member(x, xs[1:n]))
+
+        I'm not perfectly sure about this, but the reference manual
+        is very explicit that the second operand of 'and' or 'or' can
+        be anything.
+
+    Smalltalk:
+
+        Doing this example this way in Smalltalk requires considerable
+        pain in going against the grain of Smalltalk, however the
+        'and:' and 'or:' selectors in Smalltalk DO check that their
+        first argument is Boolean and DON'T check anything about (the
+        result of) their second argument.
+
+    In all of these, the "and" and "or" operations work exactly the
+    same way, and in the languages whose implementations support tail
+    recursion (Common Lisp, Scheme, Standard ML, Haskell), the
+    function shown above is tail recursive.  (I could have added more
+    languages to the list.)
+
+    Erlang stands out.  The behaviour of 'andalso' is surprising, and
+    the fact that 'andalso' and 'orelse' block tail recursion is quite
+    astonishing.  I am all in favour of giving programmers shocks that
+    teach them something useful about programming, but this one is not
+    a useful lesson.  Testing both arguments of 'and' and 'or' makes
+    sense, because the code executed for those operators always GETS
+    the values of both operands.  But 'andalso' and 'orelse' only test
+    their second operand SOME of the time.
+
+        X = 1, X >= 0 andalso X    % checked error
+        X = 1, X < 0 andalso X     % unchecked error
+
+    There doesn't seem to be much point in checking SOME of the time,
+    especially when it does something as dramatic as blocking tail
+    recursion.
+
+    As for guards, here is a small example.
+
+        f(X) when X >= 0, X < 1 -> math:sqrt(X).
+
+    This compiles to the following rather obvious code:
+
+    function, f, 1, 2}.
+      {label,1}.
+        {func_info,{atom,bar},{atom,f},1}.
+      {label,2}.
+        {test,is_ge,{f,1},[{x,0},{integer,0}]}.
+        {test,is_lt,{f,1},[{x,0},{integer,1}]}.
+        {call_ext_only,1,{extfunc,math,sqrt,1}}.
+
+    Some people expect 'andalso' to do as well or better.
+    I expected it to do the same, and this EEP requires it to.
+    Here's the source code:
+
+        g(X) when X >= 0 andalso X < 1 -> math:sqrt(X).
+
+    and here are the BEAM instructions:
+
+    {function, g, 1, 4}.
+      {label,3}.
+        {func_info,{atom,bar},{atom,g},1}.
+      {label,4}.
+        {allocate,1,1}.
+        {move,{x,0},{y,0}}.
+        {test,is_ge,{f,5},[{x,0},{integer,0}]}.
+        {bif,'<',{f,7},[{x,0},{integer,1}],{x,0}}.
+        {jump,{f,6}}.
+      {label,5}.
+        {move,{atom,false},{x,0}}.
+      {label,6}.
+        {test,is_eq_exact,{f,7},[{x,0},{atom,true}]}.
+        {move,{y,0},{x,0}}.
+        {call_ext_last,1,{extfunc,math,sqrt,1},1}.
+      {label,7}.
+        {move,{y,0},{x,0}}.
+        {deallocate,1}.
+        {jump,{f,3}}.
+
+    It not only does a lot more work, it even allocates a stack
+    frame that the traditional code does not.
+
+
+
+Rationale
+
+    There are several ways to deal with the surprising behaviour
+    of 'andalso' and 'orelse'.
+
+    0. Leave things the way they are.
+
+        The manual should have lots of warnings added,
+        saying not to use these operators, because they block
+        tail recursion and are inefficient in guards.
+
+        It is reasonable to address other issues first, but it just
+        will not do long term.  You don't have to rush around
+        bandaging everyone you meet, but you shouldn't build pit
+        traps in front of them either.
+
+    1. Remove them from the language.
+
+       I would prefer this.  And that goes double for 'and' and 'or',
+       which seem to be completely pointless, as well as confusing.
+       I do not think this would be practical politics.
+
+    2. Add new operators with sensible semantics.
+
+       But what would we call them?  'and' and 'or' are taken,
+       and both '|' and '||' are used for something else.  Above
+       all, 'andalso' and 'orelse' would still be there, and still
+       be surprising (in a bad way).  We have too many ways to
+       spell "or" as it is.
+
+    3. Fix them.
+
+    As for the recommendation that ',' and ';' should nest,
+    I want Erlang to be simple to think.  If 'andalso' and 'orelse'
+    are to act like ',' and ';' in guards -- which I've argued
+    above -- then clearly ',' and ';' should act like 'andalso'
+    and 'orelse' in guards.
+
+
+
+Backwards Compatibility
+
+    Any code that ran without raising exceptions will continue
+    to produce the same results, except for running faster.
+
+    Code that did raise exceptions may raise different exceptions
+    elsewhere later, or may quietly complete in unexpected ways.
+    I believe it to be unlikely that anyone deliberately relied
+    on (E1 andelse 0) raising an exception.
+
+    Code that was previously broken because these operators have
+    such surprising behaviour will now work in more cases.
+
+
+
+Reference Implementation
+
+    None.
+
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:
