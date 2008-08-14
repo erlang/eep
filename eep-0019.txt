@@ -1,5 +1,5 @@
-EEP: 19
-Title: Comprehension multigenerators
+EEP: XXX
+Title: Extensions to comprehensions
 Version: $Revision$
 Last-Modified: $Date$
 Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
@@ -7,7 +7,7 @@ Status: Draft
 Type: Standards Track
 Erlang-Version: R12B-4
 Content-Type: text/plain
-Created: 30-Jul-2008
+Created: 14-Aug-2008
 Post-History:
 
 
@@ -18,6 +18,8 @@ Abstract
     making code more intention-revealing and reducing the need to zip.
 
     This is related to EEP 12 [1], but is independent of it.
+
+
 
 Specification
 
@@ -54,7 +56,8 @@ Specification
 
     if we go with EEP 12.
 
-    The effect of P1 <- E1 && ... Pn <- En
+    Roughly speaking, ignoring errors and side effects,
+    the effect of P1 <- E1 && ... Pn <- En
     is the effect of {P1,...,Pn} <- zip(E1, ..., En)
     where
 
@@ -73,6 +76,93 @@ Specification
         P [<-] E   with   P <- E
     and then applying the translation above.
 
+    In the presence of errors, the behaviour of && is not precisely
+    the same as using zip.  We need to specify the actual behaviour
+    more precisely.  For brevity, I ignore binary enumeration.  Both
+    tuple enumeration and tuple comprehension are currently defined
+    by rewriting to plain list comprehension, so that's all we need
+    to worry about for now.
+
+    A list comprehension has the form [E || C1, ..., Cn]
+    where each Ci is
+        - a generator Pattern <- List_Expression
+        - a binding   Pattern =  Any_Expression
+        - a "guard"   Other_Expression that should give true or false.
+    This acts like
+
+        R = [],
+        <| E || [C1, ..., Cn] |>(R),
+        reverse(R)
+
+    where
+
+        <| E || [] |>(R)
+    =>  R = [E | R]             % reassign R
+
+        <| E || [Pi <- Ei|Cs] |>(R)
+    =>  Ti = Ei
+        Label: case Ti
+                 of [Pi|X] -> Ti = X % reassign Ti
+                              <| E || Cs |>(R)
+                              goto Label
+                  ; [_ |X] -> Ti = X % reassign Ti
+                              goto Label
+                  ; []     -> ok                              
+               end
+        
+        <| E || [Pi = Ei|Cs] |>(R)
+    =>  case Ei
+          of Pi -> <| E || Cs |>(R)
+           ; _  -> ok
+        end
+
+        <| E || [Ei|Cs] |>(R)
+    =>  case Ei
+          of true  -> <| E || Cs |>(R)
+           ; false -> ok
+        end
+        
+    In these translations, pattern matching syntax is used, with the
+    intent that the variables which are unbound according to the
+    normal rules of Erlang, and thus get bound by the Pi <- or Pi =
+    matching, are treated *as if* unbound in the code to be generated,
+    ignoring whatever values they might previous have had.  That also
+    applies when R or Ti appears on the left of a pattern match; the
+    fact that the variable really was bound is ignored and a simple
+    assignment is done.
+
+    This does involve (re-)assignment to local variables in the code
+    to be generated, but it does NOT involve user-visible assignment
+    and it does NOT involve mutable data structures.  It is no more
+    problematic for the language or the runtime system than reusing a
+    dead register is.
+
+    Handling multi-list enumeration is a simple, albeit schematic,
+    change to the rule for enumeration.
+
+        <| E || [Pi1 <- Ei1 && Pi2 <- Ei2 && ... && Pik <- Eik|Cs] |>(R)
+    =>  Ti1 = Ei1
+        ...
+        Tik = Eik
+        Label: case {Ti1,...,Tik}
+                 of {[Pi1|X1], ..., [Pik,Xk]} ->
+                    Ti1 = X1    % reassign
+                    ...
+                    Tik = Xk    % reassign
+                    <| E || Cs |>(R)
+                    goto label
+                  ; {[_|X1], ..., [_|Xk]} ->
+                    Ti1 = X1    % reassign
+                    ...
+                    Tik = Xk    % reassign
+                  ; {[], ..., []} ->
+                    ok
+               end
+        
+    Note that the use of tuple syntax in the case expression and the
+    case clauses does not imply the literal creation of a tuple in
+    the generated code, only that k values are to be matched against
+    k patterns in each case clause.
 
 
 
@@ -105,6 +195,29 @@ Motivation
             || T <- Tests && X <- Xs && Y <- Ys
             ].
 
+    This code from module dialyzer_dep
+
+        merge_outs([#output{type=list, content=L1}|Left],
+                   #output{type=list, content=L2}) ->
+          NewList = [merge_outs([X, Y]) || {X, Y} <- lists:zip(L1, L2)],
+          merge_outs(Left, output(NewList));
+
+    would become
+
+        merge_outs([#output{type=list, content=L1}|Left],
+                    #output{type=list, content=L2]) ->
+            merge_outs(Left, output(
+                [merge_outs([X,Y]) || X <- L1 && Y <- L2]));
+
+    This code from forward_args/3 in module dialyzer_dataflow
+
+        NewArgTypes = [t_sup(X, Y) ||
+                       {X, Y} <- lists:zip(ArgTypes, OldArgTypes)],
+
+    would become
+
+        NewArgTypes = [t_sup(X, Y) || X <- ArgTypes && Y <- OldArgTypes],
+
 
 
 Rationale
@@ -136,7 +249,7 @@ Rationale
         foo([_|Xs]) -> foo(Xs);
         foo([]) -> [].
 
-    With a multigenerator, the translation is similar.
+    With a multi-sequence generator, the translation is similar.
 
         [g(X, Y) || X <- Xs && Y <- Ys, X > Y]
     
@@ -150,6 +263,43 @@ Rationale
             [g(X, Y) | bar(Xs, Ys)];
         bar([_|Xs], [_|Ys]) -> bar(Xs, Ys);
         bar([], []) -> [].
+
+    The specification above gives the kind of translation I would like
+    to see; I do have an implementation in mind (based on Pop-2) that
+    doesn't need the reversal but don't know how it would fit in BEAM.
+
+    One obvious question is whether we need this at all.  Why not just
+    get people to write calls to lists:zip and get the compiler to
+    optimise them?  One answer is that this notation is much clearer;
+    the programmer's *intent* is to advance along two or more lists
+    at the same time, not to create a list of pairs.  When you want to
+    create a list of pairs, lists:zip/2 is the perfect way to do it.
+    A more important answer is that the proposed notation is NOT a
+    simple optimisation of equivalent code using lists:zip/2.
+
+        [E || {P,Q} <- lists:zip(A, B)]    % "zip version"
+
+    fails at once if A and B are not proper lists of the same length.
+
+        [E || P <- A && Q <- B]            % "Clean version"
+
+    eventually fails if A and B are not proper lists of the same
+    length, but may have evaluated E (which may have had side effects)
+    many times before that.  So an Erlang compiler would not be
+    allowed to replace the "zip version" by the "Clean version" unless
+    it could prove both that A and B were lists (which may be within
+    the abilities of the Dialyzer) and that they were exactly the same
+    length (which as far as I know isn't).
+
+    However, a multi-sequence generator and a single-sequence one
+    using calls to lists:zip/2 are clearly *similar*, so they should
+    eventually react to lists of different length the same way.
+    In Haskell, zipping two lists of different length acts as if the
+    longer were truncated to the length of the shorter.  Since
+    Haskell has lazy evaluation, lists may be infinite, so you can't
+    afford to wait until the end to start a comprehension.  Since
+    Erlang is strict, and since mistakes are common, lists:zip/2 in
+    Erlang makes sense as it is.
 
 
 
