@@ -1,5 +1,5 @@
-EEP: XXX
-Title: Extensions to comprehensions
+EEP: 19
+Title: Comprehension multigenerators
 Version: $Revision$
 Last-Modified: $Date$
 Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
