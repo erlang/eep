@@ -22,7 +22,7 @@ Numerical Index
      ---  -----                                          -----
 
  P     0  Index of Erlang Enhancement Proposals (EEPs)   Raimo Niskanen
- P     1  EEP Purpose and Guidelines                     Per Gustafsson
+ P     1  EEP Purpose and Guidelines                     Per Gustafsson, Raimo Niskanen
  P     2  Sample Plaintext EEP Template                  Per Gustafsson
  P     3  Sample reStructuredText EEP Template           Per Gustafsson
 

@@ -74,10 +74,16 @@ enhancements or patches often don't need a EEP and can be injected
 into the Erlang development work flow by sending a patch to
 erlang-patches@erlang.org.
 
-The EEP champion subscribes to the email list <eeps@erlang.org> (see
-http://www.erlang.org/mailman/listinfo/eeps) and sends a rough
-but fleshed out draft of the EEP, with a proposed title, to that list.
-This draft must be written in EEP style as described below.
+The EEP champion writes a rough but fleshed out draft of the EEP,
+with a proposed title. This draft must be written in EEP style
+as described below. Then, after subscribing to the email list
+<eeps@erlang.org>, the EEP champion sends the EEP to that list.
+Note that the list has a size limit for posts,
+at the time of writing 128 KByte, so EEPs with attachments
+that are too large will bounce. Large attachments can be put
+on a suitable web page and then be referred to from the EEP.
+If that is not possible, ask on the list how to
+submit the large EEP in question.
 
 If the EEP editor approves, he will assign the EEP a number, label it
 as Standards Track or Process, give it status "Draft",
