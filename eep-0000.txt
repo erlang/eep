@@ -44,6 +44,7 @@ Numerical Index
  S    19  Comprehension multigenerators                  Richard A. O'Keefe
  S    20  Split the atoms!                               Richard A. O'Keefe
  S    21  Optional trailing commas for lists and tuples  Richard A. O'Keefe
+ S    22  Range checking for binaries                    Richard A. O'Keefe
 
 Key
 
