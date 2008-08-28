@@ -18,44 +18,47 @@ Introduction
 
 Numerical Index
 
-     num  title                                          owner
-     ---  -----                                          -----
+           num  title                                          owner
+           ---  -----                                          -----
 
- P     0  Index of Erlang Enhancement Proposals (EEPs)   Raimo Niskanen
- P     1  EEP Purpose and Guidelines                     Per Gustafsson, Raimo Niskanen
- P     2  Sample Plaintext EEP Template                  Per Gustafsson
- P     3  Sample reStructuredText EEP Template           Per Gustafsson
+ P           0  Index of Erlang Enhancement Proposals (EEPs)   Raimo Niskanen
+ P           1  EEP Purpose and Guidelines                     Per Gustafsson, Raimo Niskanen
+ P           2  Sample Plaintext EEP Template                  Per Gustafsson
+ P           3  Sample reStructuredText EEP Template           Per Gustafsson
 
- SA    4  New BIFs for bit-level binaries (bit strings)  Per Gustafsson
- S     5  More Versatile Encapsulation with export_to    Per Gustafsson
- SA    6  New BIFs for tuple and binary sizes            Bjorn Gustavsson
- S     7  Foreign Function Interface (FFI)               Alceste Scalas
- S     8  Types and function specifications              Kostis Sagonas
- S     9  Library for working with binaries              Fredrik Svahn
- S    10  Representing Unicode characters in Erlang      Patrik Nyblom
- S    11  Built in regular expressions in Erlang         Patrik Nyblom
- S    12  Extensions to comprehensions                   Richard A. O'Keefe
- S    13  -enum declarations                             Richard A. O'Keefe
- S    14  Guard clarification and extension              Richard A. O'Keefe
- S    15  Portable funs                                  Richard A. O'Keefe
- S    16  is_between/3                                   Richard A. O'Keefe
- S    17  Fix andalso and orelse                         Richard A. O'Keefe
- S    18  JSON bifs                                      Richard A. O'Keefe
- S    19  Comprehension multigenerators                  Richard A. O'Keefe
- S    20  Split the atoms!                               Richard A. O'Keefe
- S    21  Optional trailing commas for lists and tuples  Richard A. O'Keefe
- S    22  Range checking for binaries                    Richard A. O'Keefe
+ SF/R12B-0   4  New BIFs for bit-level binaries (bit strings)  Per Gustafsson
+ S           5  More Versatile Encapsulation with export_to    Per Gustafsson
+ SF/R12B-0   6  New BIFs for tuple and binary sizes            Bjorn Gustavsson
+ S           7  Foreign Function Interface (FFI)               Alceste Scalas
+ S           8  Types and function specifications              Kostis Sagonas
+ S           9  Library for working with binaries              Fredrik Svahn
+ SA         10  Representing Unicode characters in Erlang      Patrik Nyblom
+ SA/R12B-3u 11  Built in regular expressions in Erlang         Patrik Nyblom
+ S          12  Extensions to comprehensions                   Richard A. O'Keefe
+ S          13  -enum declarations                             Richard A. O'Keefe
+ S          14  Guard clarification and extension              Richard A. O'Keefe
+ S          15  Portable funs                                  Richard A. O'Keefe
+ S          16  is_between/3                                   Richard A. O'Keefe
+ S          17  Fix andalso and orelse                         Richard A. O'Keefe
+ S          18  JSON bifs                                      Richard A. O'Keefe
+ S          19  Comprehension multigenerators                  Richard A. O'Keefe
+ S          20  Split the atoms!                               Richard A. O'Keefe
+ S          21  Optional trailing commas for lists and tuples  Richard A. O'Keefe
+ S          22  Range checking for binaries                    Richard A. O'Keefe
 
 Key
 
-    S - Standards Track EEP
-    P - Process EEP
+    S        - Standards Track EEP
+    P        - Process EEP
 
-    A - Accepted proposal
-    R - Rejected proposal
-    W - Withdrawn proposal
-    D - Deferred proposal
-    F - Final proposal
+    A        - Accepted proposal
+    R        - Rejected proposal
+    W        - Withdrawn proposal
+    D        - Deferred proposal
+    F        - Final proposal
+    /R12B-0  - Proposal is implemented in OTP release R12B-0
+    /R12B-3u - Proposal is implemented in OTP release R12B-3,
+               except for Unicode support according to EEP 10
 
 Owners
 
