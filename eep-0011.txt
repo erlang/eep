@@ -1,13 +1,13 @@
 EEP: 11
 Title: Built in regular expressions in Erlang
-Version: $Id: re_in_erlang.txt,v 1.9 2008/06/11 13:56:34 pan Exp $
+Version: $Id: re_in_erlang.txt,v 1.11 2008/09/10 15:35:51 pan Exp $
 Last-Modified: $Date$
 Author: Patrik Nyblom
 Status: Draft
 Type: Standards Track
 Content-Type: text/x-rst
 Created: 04-06-2008
-Erlang-Version: R12B-4
+Erlang-Version: R12B-5
 Post-History: 01-Jan-1970
 
 Abstract
@@ -232,10 +232,25 @@ for execution).
 
 Around these two suggested functions one can implement functionality
 in Erlang to mimic the existing regular expression library or
-implement new functionality. The names of the functions should be
-chosen so that mixup with the current regexp library functions is
-avoided, why I suggest "compile" and "run" as names for the respective
-functions. Here follows part of the suggested manual page:
+implement new functionality. 
+
+The current regexp module can, apart from matching, split a string
+according to a regular expression (functionality similar to the Perl
+built in function split) and do substitution of sub-strings based on
+regular expression matching (like the s/<RE>/<String>/ expression in
+Perl or awk). With corresponding functions in the "re" module, the new
+module would provide all functionality of the old one.
+
+The names of the functions should, as much as possible, be chosen so
+that mix up with the current regexp library functions is avoided, why I
+suggest "compile" and "run" and "replace" as names for regexp
+compilation, execution and substitution respectively. As no good
+synonym for the name "split" has emerged, that name is retained in the
+new module.
+
+
+
+Here follows part of the suggested manual page:
 
 Excerpt from a suggested manual page
 ::::::::::::::::::::::::::::::::::::
@@ -245,7 +260,6 @@ DATA TYPES
 
 - iodata() = iolist() | binary()
 - iolist() = [char() | binary() | iolist()]
-  
   * a binary is allowed as the tail of the list
 
 - mp() = Opaque datatype containing a compiled regular expression.
@@ -259,7 +273,7 @@ Types:
 
 - Regexp = iodata()
 
-The same as compile(Regexp,[]).
+The same as compile(Regexp,[])
 
 **compile(Regexp,Options) -> {** ``ok`` **, MP} | {** ``error`` **, ErrSpec}**
 
@@ -267,8 +281,8 @@ Types:
 
 - Regexp = iodata()
 - Options = [ Option ]
-- Option = ``anchored`` | ``caseless`` | ``dollar_endonly`` | ``dotall`` | ``extended`` | ``firstline`` | ``multiline`` | ``no_auto_capture`` | ``dupnames`` | ``ungreedy`` | { ``newline`` , NLSpec}
-- NLSpec = ``cr`` | ``crlf`` | ``lf`` | ``anycrlf``
+- Option = anchored | caseless | dollar_endonly | dotall | extended | firstline | multiline | no_auto_capture | dupnames | ungreedy | {newline, NLSpec}
+- NLSpec = cr | crlf | lf | anycrlf
 - MP = mp()
 - ErrSpec = {ErrString, Position}
 - ErrString = string()
@@ -301,13 +315,13 @@ The options have the following meanings:
     Names used to identify capturing subpatterns need not be unique. This can be helpful for certain types of pattern when it is known that only one instance of the named subpattern can ever be matched. There are more details of named subpatterns below 
 ``ungreedy``
     This option inverts the "greediness" of the quantifiers so that they are not greedy by default, but become greedy if followed by "?". It is not compatible with Perl. It can also be set by a (?U) option setting within the pattern. 
-{ ``newline`` , NLSpec}
+{``newline`` , NLSpec}
     Override the default definition of a newline in the subject string, which is LF (ASCII 10) in Erlang.
 
     ``cr``
-        Newline is indicated by a single character CR (ASCII 13). 
+        Newline is indicated by a single character CR (ASCII 13) 
     ``lf``
-        Newline is indicated by a single character LF (ASCII 10), the default. 
+        Newline is indicated by a single character LF (ASCII 10), the default 
     ``crlf``
         Newline is indicated by the two-character CRLF (ASCII 13 followed by ASCII 10) sequence. 
     ``anycrlf``
@@ -317,43 +331,43 @@ The options have the following meanings:
 
 Types:
 
-- RE = mp() | iodata()
 - Subject = iodata()
+- RE = mp() | iodata()
 - Captured = [ CaptureData ]
 - CaptureData = {int(),int()} | string() | binary()
 - ErrSpec = {ErrString, Position}
 - ErrString = string()
 - Position = int()
 
-The same as run(RE,Subject,[]).
+The same as run(Subject,RE,[]).
 
-**run(Subject,RE,Options) -> ``match`` | {** ``match`` **, Captured} |** ``nomatch`` **| {** ``error`` **, ErrSpec}**
+**run(Subject,RE) -> {** ``match`` **, Captured} |** ``match`` **|** ``nomatch`` **| {** ``error`` **, ErrSpec}**
 
 Types:
 
-- RE = mp() | iodata()
 - Subject = iodata()
+- RE = mp() | iodata()
 - Options = [ Option ]
-- Option = ``anchored`` | ``notbol`` | ``noteol`` | ``notempty`` | { ``offset`` , int()} | { ``newline`` , NLSpec} | { ``capture`` , ValueSpec} | { ``capture``, ValueSpec, Type} | CompileOpt
-- Type = ``index`` | ``list`` | ``binary``
-- ValueSpec = ``all`` | ``all_but_first`` | ``first`` | ValueList
+- Option = anchored | global | notbol | noteol | notempty | {offset, int()} | {newline, NLSpec} | {capture, ValueSpec} | {capture, ValueSpec, Type} | CompileOpt
+- Type = index | list | binary
+- ValueSpec = all | all_but_first | first | ValueList
 - ValueList = [ ValueID ]
 - ValueID = int() | string() | atom()
 - CompileOpt = see compile/2 above
-- NLSpec = ``cr`` | ``crlf`` | ``lf`` | ``anycrlf``
-- Captured = [ CaptureData ]
+- NLSpec = cr | crlf | lf | anycrlf
+- Captured = [ CaptureData ] | [ [ CaptureData ] ... ]
 - CaptureData = {int(),int()} | string() | binary()
 - ErrSpec = {ErrString, Position}
 - ErrString = string()
 - Position = int()
 
-Executes a regexp matching, returning {match, Captured} or nomatch. The regular expression can be given either as iodata() in which case it is automatically compiled (as by re:compile/2) and executed, or as a pre compiled mp() in which case it is executed against the subject directly.
+Executes a regexp matching, returning ``match`` /{ ``match`` , Captured} or ``nomatch`` . The regular expression can be given either as iodata() in which case it is automatically compiled (as by re:compile/2) and executed, or as a pre compiled mp() in which case it is executed against the subject directly.
 
 When compilation is involved, the function may return compilation errors as when compiling separately ({ ``error`` , {string(),int()}}); when only matching, no errors are returned.
 
-The option list can only contain the options ``anchored``, ``notbol``, ``noteol``, ``notempty``, { ``offset`` , int()}, { ``newline`` , NLSpec} and { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type} if the regular expression is previously compiled, otherwise all options valid for the re:compile/2 function are allowed as well. Options allowed both for compilation and execution of a match, namely ``anchored`` and { ``newline`` , NLSpec}, will affect both the compilation and execution if present together with a non pre-compiled regular expression.
+If the regular expression is previously compiled, the option list can only contain the options ``anchored``, ``global``, ``notbol``, ``noteol``, ``notempty``, { ``offset`` , int()}, { ``newline`` , NLSpec} and { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type}. Otherwise all options valid for the re:compile/2 function are allowed as well. Options allowed both for compilation and execution of a match, namely ``anchored`` and { ``newline`` , NLSpec}, will affect both the compilation and execution if present together with a non pre-compiled regular expression.
 
-The { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type} defines what to return from the function upon successful matching. The capture tuple may contain both a value specification telling which of the captured substrings are to be returned, and a type specification, telling how captured substrings are to be returned (as index tuples, lists or binaries). The capture option makes the function quite flexible and powerful. The different options are described in detail below.
+The { ``capture`` , ValueSpec}/{ ``capture`` , ValueSpec, Type} defines what to return from the function upon successful matching. The capture tuple may contain both a value specification telling which of the captured substrings are to be returned, and a type specification, telling how captured substrings are to be returned (as index tuples, lists or binaries). The capture option makes the function quite flexible and powerful. The different options are described in detail below
 
 If the capture options describe that no substring capturing at all is to be done ({ ``capture`` , ``none`` }), the function will return the single atom match upon successful matching, otherwise the tuple { ``match`` , ValueList} is returned. Disabling capturing can be done either by specifying none or an empty list as ValueSpec.
 
@@ -361,6 +375,35 @@ A description of all the options relevant for execution follows:
 
 ``anchored``
     Limits re:run/3 to matching at the first matching position. If a pattern was compiled with anchored, or turned out to be anchored by virtue of its contents, it cannot be made unachored at matching time, hence there is no unanchored option. 
+``global``
+    Implements global (repetitive) search as the g flag in i.e. Perl. Each match found is returned as a separate list() containing the specific match as well as any matching subexpressions (or as specified by the capture option). The Captured part of the return value will hence be a list() of list()'s when this option is given.
+    When the regular expression matches an empty string, the behaviour might seem non-intuitive, why the behaviour requites some clarifying. With the global option, re:run/3 handles empty matches in the same way as Perl, meaning that a match at any point giving an empty string (with length 0) will be retried with the options [anchored, notempty] as well. If that search gives a result of length > 0, the result is included. An example::
+
+        re:run("cat","(|at)",[global]).
+
+    The matching will be performed as following:
+
+    At offset 0
+        The regexp ``(|at)`` will first match at the initial position of
+        the string cat, giving the result set [{0,0},{0,0}] (the
+        second {0,0} is due to the subexpression marked by the
+        parentheses). As the length of the match is 0, we don't
+        advance to the next position yet.
+    At offset 0 with [ ``anchored`` , ``notempty`` ]
+        The search is retried with the options [anchored, notempty] at the same position, which does not give any interesting result of longer length, why the search position is now advanced to the next character (a). 
+    At offset 1
+        Now the search results in [{1,0},{1,0}] meaning this search will also be repeated with the extra options. 
+    At offset 1 with [ ``anchored`` , ``notempty`` ]
+        Now the ab alternative is found and the result will be [{1,2},{1,2}]. The result is added to the list of results and the position in the search string is advanced two steps. 
+    At offset 3
+        The search now once again matches the empty string, giving [{3,0},{3,0}]. 
+    At offset 1 with [ ``anchored`` , ``notempty`` ]
+        This will give no result of length > 0 and we are at the last position, so the global search is complete. 
+
+    The result of the call is::
+
+         {match,[[{0,0},{0,0}],[{1,0},{1,0}],[{1,2},{1,2}],[{3,0},{3,0}]]}
+
 ``notempty``
     An empty string is not considered to be a valid match if this option is given. If there are alternatives in the pattern, they are tried. If all the alternatives match the empty string, the entire match fails. For example, if the pattern::
 
@@ -457,7 +500,16 @@ A description of all the options relevant for execution follows:
 
             {match,[{3,4}]}
 
-        The values list might specify indexes or names not present in the regular expression, in which case the return values vary depending on the type. If the type is index, the tuple {-1,0} is returned for values having no corresponding subpattern in the regexp, but for the other types (binary and list), the values are the empty binary or list respectively. This makes it impossible to differentiate between a empty matching subpattern and an invalid subpattern name in the return values for those types. If that differentiation is necessary, use the type index and do the conversion to the final type in Erlang code.
+        The values list might specify indexes or names not present in the regular expression, in which case the return values vary depending on the type. If the type is index, the tuple {-1,0} is returned for values having no corresponding subpattern in the regexp, but for the other types (binary and list), the values are the empty binary or list respectively.
+    Type
+        Optionally specifies how captured substrings are to be returned. If omitted, the default of index is used. The Type can be one of the following:
+
+        ``index``
+            Return captured substrings as pairs of byte indexes into the subject string and length of the matching string in the subject (as if the subject string was flattened with iolist_to_binary prior to matching). This is the default. 
+        ``list``
+            Return matching substrings as lists of characters (Erlang string()'s). 
+        ``binary``
+            Return matching substrings as binaries. 
 
     In general, subpatterns that got assigned no value in the match are returned as the tuple {-1,0} when type is index. Unasigned subpatterns are returned as the empty binary or list respectively for other return types. Consider the regular expression::
 
@@ -476,18 +528,179 @@ A description of all the options relevant for execution follows:
         {match,[<<"ABCabcdABC">>,<<"abcd">>,<<>>,<<"bcd">>]}
 
     where the empty binary (<<>>) represents the unassigned subpattern. In the binary case, some information about the matching is therefore lost, the <<>> might just as well be an empty string captured.
+    If differentiation between empty matches and non existing subpatterns is necessary, use the type index and do the conversion to the final type in Erlang code.
+    When the option global is given, the capture specification affects each match separately, so that::
 
-    Type
-        Optionally specifies how captured substrings are to be returned. If omitted, the default of index is used. The Type can be one of the following:
+        re:run("cacb","c(a|b)",[global,{capture,[1],list}]).
 
-        ``index``
-            Return captured substrings as pairs of byte indexes into the subject string and length of the matching string in the subject (as if the subject string was flattened with i.e. iolist_to_binary prior to matching). This is the default. 
-        ``list``
-            Return matching substrings as lists of characters (Erlang string()'s). 
-        ``binary``
-            Return matching substrings as binaries. 
+    gives the result::
+
+        {match,[["a"],["b"]]}
 
 The options solely affecting the compilation step are described in the re:compile/2 function.
+
+**replace(Subject,RE,Replacement) -> iodata() | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Subject = iodata()
+- RE = mp() | iodata()
+- Replacement = iodata()
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+The same as replace(Subject,RE,Replacement,[]).
+
+**replace(Subject, RE, Replacement, Options) -> iodata() | binary() | list() | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Subject = iodata()
+- RE = mp() | iodata()
+- Replacement = iodata()
+- Options = [ Option ]
+- Option = anchored | global | notbol | noteol | notempty | {offset, int()} | {newline, NLSpec} | {return, ReturnType} | CompileOpt
+- ReturnType = iodata | list | binary
+- CompileOpt = see compile/2 above
+- NLSpec = cr | crlf | lf | anycrlf
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+Replaces the matched part of the Subject string with the content of Replacement.
+
+Options are given as to the re:run/3 function except that the ``capture`` option of re:run/3 is not allowed. Instead a { ``return`` , ReturnType} is present. The default return type is ``iodata`` , constructed in a way to minimize copying. The iodata result can be used directly in many i/o-operations. If a flat list() is desired, specify { ``return`` , ``list`` } and if a binary is preferred, specify { ``return`` , ``binary`` }.
+
+The replacement string can contain the special character ``&`` , which inserts the whole matching expression in the result, and the special sequence ``\N`` (where N is an integer > 0), resulting in the subexpression number N will be inserted in the result. If no subexpression with that number is generated by the regular expression, nothing is inserted.
+
+To insert an ``&`` or ``\`` in the result, precede it with a ``\``. Note that Erlang already gives a special meaning to ``\`` in literal strings, why a single ``\`` has to be written as ``"\\"`` and therefore a double ``\`` as ``"\\\\"`` . Example::
+
+    re:replace("abcd","c","[&]",[{return,list}]).
+
+gives::
+
+    "ab[c]d"
+
+while::
+
+    re:replace("abcd","c","[\\&]",[{return,list}]).
+
+gives::
+
+    "ab[&]d"
+
+The { ``error`` , ErrSpec} return value can only arise from compilation, i.e. when a non precompiled malformed RE is given.
+
+**split(Subject,RE) -> SplitList | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Subject = iodata()
+- RE = mp() | iodata()
+- SplitList = [ iodata() ]
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+The same as split(Subject,RE,[]).
+
+**split(Subject,RE,Options) -> SplitList | {** ``error`` **, ErrSpec}**
+
+Types:
+
+- Subject = iodata()
+- RE = mp() | iodata()
+- Options = [ Option ]
+- Option = anchored | global | notbol | noteol | notempty | {offset, int()} | {newline, NLSpec} | {return, ReturnType} | {parts, NumParts} | group | CompileOpt
+- NumParts = int() | infinity
+- ReturnType = iodata | list | binary
+- CompileOpt = see compile/2 above
+- NLSpec = cr | crlf | lf | anycrlf
+- SplitList = [ RetData ] | [ GroupedRetData ]
+- GroupedRetData = [ RetData ]
+- RetData = iodata() | binary() | list()
+- ErrSpec = {ErrString, Position}
+- ErrString = string()
+- Position = int()
+
+This function splits the input into parts by finding tokens according to the regular expression supplied.
+
+The splitting is done basically by running a global regexp match and dividing the initial string wherever a match occurs. The matching part of the string is removed from the output.
+
+The result is given as a list of "strings", the preferred datatype given in the return option (default ``iodata`` ).
+
+If subexpressions are given in the regular expression, the matching subexpressions are returned in the resulting list as well. An example::
+
+    re:split("Erlang","[ln]",[{return,list}]).
+
+will yield the result::
+
+    ["Er","a","g"]
+
+while::
+
+    re:split("Erlang","([ln])",[{return,list}]).
+
+will yield::
+
+    ["Er","l","a","n","g"]
+
+The text matching the subexpression (marked by the parantheses in the regexp) is inserted in the result list where it was found. In effect this means that concatenating the result of a split where the whole regexp is a single subexpression (as in the example above) will always result in the original string.
+
+As there is no matching subexpression for the last part in the example (the "g"), there is nothing inserted after that. To make the group of strings and the parts matching the subexpressions more obvious, one might use the group option, which groups together the part of the subject string with the parts matching the subexpressions when the string was split::
+
+    re:split("Erlang","([ln])",[{return,list},group]).
+
+gives::
+
+    [["Er","l"],["a","n"],["g"]]
+
+Here the regular expression matched first the "l", causing "Er" to be the first part in the result. When the regular expression matched, the (only) subexpression was bound to the "l", why the "l" is inserted in the group together with "Er". The next match is of the "n", making "a" the next part to be returned. As the subexpression is bound to the substring "n" in this case, the "n" is inserted into this group. The last group consists of the rest of the string, as no more matches are found.
+
+All empty strings are per default removed from the end of the result list, the semantics beeing that we split the string in as many parts as possible until we reach the end of the string. In effect this means that all empty strings are stripped from the result list (or all empty groups if the group option is given). The ``parts`` option can be used to change this behaviour. Let's look at an example::
+
+    re:split("Erlang","[lg]",[{return,list}]).
+
+The result will be::
+
+    ["Er","an"]
+
+as the matching of the "g" in the end effectively makes the matching reach the end of the string. If we however say we want more parts::
+
+    re:split("Erlang","[lg]",[{return,list},{parts,3}]).
+
+We will get the last part as well, even though there is only an empty string after the last match (matching the "g")::
+
+    ["Er","an",[]]
+
+More than three parts are not possible with this indata, why::
+
+    re:split("Erlang","[lg]",[{return,list},{parts,4}]).
+
+will give the same result. To specify that as many results as possible are to be returned, including any empty results at end, you can specify infinity as the number of parts to return. Specifying 0 as the number of parts gives the default behaviour of returning all parts except empty parts at the end.
+
+If subexpressions are captured, empty subexpression matches at the end are also stripped from the result if { ``parts`` ,N} is not specified. If you are familiar with Perl, the default behaviour corresponds exactly to the Perl default, the { ``parts`` ,N} where N is a positive integer corresponds exactly to the Perl behaviour with a positive numerical third parameter and the {parts, infinity} behaviour corresponds to that when the Perl routine is given a negative integer as the third parameter.
+
+Summary of options not previously described for the re:run/3 function:
+
+{ ``return`` ,ReturnType}
+    Specifies how the parts of the original string are presented in the result list. The possible types are:
+
+    ``iodata``
+        The variant of iodata() that gives the least copying of data with the current implementation (often a binary, but don't depend on it). 
+    ``binary``
+        All parts returned as binaries. 
+    ``list``
+        All parts returned as lists of characters ("strings"). 
+
+``group``
+    Groups together the part of the string with the parts of the string matching the subexpressions of the regexp.
+    The return value from the function will in this case be a list() of list()'s. Each sublist begins with the string picked out of the subject string, followed by the parts matching each of the subexpressions in order of occurence in the regular expression.
+{ ``parts`` ,N}
+    Specifies the number of parts the subject string is to be split into.
+    The number of parts should be 0 for the default behaviour "as many as there are, skipping empty parts at the end", a positive integer for a specific maximum on the number of parts and infinity for the maximum number of parts possible, regardless of if the parts are empty strings at the end.
+
 
 Supported string representations
 ::::::::::::::::::::::::::::::::
@@ -504,18 +717,16 @@ Further extensions
 The following extensions are not yet implemented in the prototype, but
 should be included in a final release:
 
-- Unicode support, a "unicode" option to the compilation and automatic
-  handling of (possibly mixed) Unicode strings represented as
-  suggested in EEP 10.
+- Unicode support. Unicode strings should be represented as suggested
+  in EEP 10, which means either UTF-8 in binaries, lists of Unicode
+  characters as integers, or a mix thereof. If the regular expression
+  was compiled for Unicode or a ``unicode`` option is supplied when
+  compiling and running in one go, the data is expected to be in one
+  of the supported Unicode formats, otherwise a ``badarg`` exception
+  will be thrown.
 
 - Match predicates to make it easy to use regular expressions in
   logical Erlang expressions.
-
-- String substitution functionality.
-
-- Mimicking of interface functions in the old regexp library,
-  either with the same function names (which however might encourage
-  mix up of the modules) or with new names.
 
 Of these, Unicode support is the far most important, and also the one
 that can not be implemented efficiently purely in Erlang code.
@@ -524,9 +735,10 @@ Prototype implementation
 ------------------------
 
 A prototype implementation using the PCRE library is present along
-with a reference manual page in the R12B-3 distribution. This
+with a reference manual page in the R12B-4 distribution. This
 implementation does not yet fully support Unicode, as EEP 10 is not
-accepted at the time of writing.
+accepted at the time of writing. The prototype implementation also 
+lacks the "split" function, which was implemented after the R12B-4 release. 
 
 In terms of performance, fairly simple regular expressions matches are
 with this prototype up to 75 times faster than with the current regexp
