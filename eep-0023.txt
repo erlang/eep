@@ -1,0 +1,120 @@
+EEP: 23
+Title: Allow variables in fun M:F/A
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 08-Aug-2008
+Post-History:
+
+
+
+Abstract
+
+    fun M:F/A should allow M, F, and/or A to be a variable.
+
+
+
+Specification
+
+    The form fun M:F/A currently requires M to be an atom,
+    F to be an atom, and A to be a non-negative integer.
+    This is generalised to allow any or all of them to be
+    variables.
+
+
+
+Motivation
+
+    Representing functions by tuples {M,F,A} is now deprecated.
+    Yet there are times when some of this information is not
+    available until run time.  For example, a behaviour's author
+    might wish to refer to the start/0 function in the Callback
+    module, but there might be any number of Callback modules at
+    run time.
+
+    It is absurd that the module name and function name in a call
+    of the form M:F(E1, ..., En) may be either atoms or variables,
+    but that they may not be variables in fun M:F/A.
+
+    It turns out that fun M:F/A is currently implemented as a call
+    to erlang:make_fun(M, F, A), so the ability to create such
+    funs given run-time data already exists.  All that is missing
+    is to wrap some syntax around it.
+
+
+
+Rationale
+
+    The gap that's being filled here is one that has been felt in
+    practice.  See a September 2008 thread in the Erlang mailing list.
+    The proposal generalises an existing form, but not more than the
+    existing function call syntax has already been generalised.
+
+    It is perhaps the limits of this proposal that need explaining.
+
+    First, the extension is from constants to constants or variables,
+    not to arbitrary expressions.  This is mainly to avoid confusing
+    parsers and people.  The effect of fun (E1):(E2)/(E3) can be had
+    by writing M = E1, F = E2, A = E3, fun M:F/A, so there is no loss
+    of expressiveness.  Since Erlang's equivalent of a lambda form
+    begins with "fun (", fun (E1):... would be tricky to parse and
+    very confusing to people.
+	
+    Second, the extension is for fun M:F/A only, and not for fun F/A.
+    That's because there is no erlang:make_fun/2 to call; the
+    implementation of fun F/A is surprisingly tricky and involves
+    creating a special-purpose glue function.  For many purposes,
+    fun ?MODULE:F/A will serve instead.
+
+
+
+Backwards Compatibility
+
+    All existing Erlang code remains acceptable with unchanged
+    semantics.  No new functions or instructions are added, so
+    BEAM files produced with the new parser will work in older
+    releases.
+
+
+
+Reference Implementation
+
+    The auxiliary file eep-0023-1.diff
+    is a patch file to be applied to erl_parse.yrl.
+    The patched file has been checked by yecc, which is happy
+    with it, and the resulting .erl file compiles cleanly.
+    However, that's all the testing that has been done.
+
+    All that the implementation does is to
+    (a) accept fun M:F/A where M, F, and A are constants or
+        variables,
+    (b) generate the same abstract syntax term that was
+	generated in the past when they are all constants,
+    (c) pretend that erlang:make_fun(M, F, A) had been written
+        when at least one is a variable.
+    Only the parser is involved.
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:
