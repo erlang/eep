@@ -1,0 +1,14 @@
+*** parse1.yrl  Thu Jul 10 13:50:11 2008
+--- parse8.yrl  Tue Oct 21 12:57:15 2008
+***************
+*** 744,749 ****
+--- 744,752 ----
+ normalise({op,_,'-',{char,_,I}}) -> -I;               %Weird, but compatible!
+ normalise({op,_,'-',{integer,_,I}}) -> -I;
+ normalise({op,_,'-',{float,_,F}}) -> -F;
++ %% Name/Arity case
++ normalise({op,_,'/',{atom,_,F},{integer,_,N}}) when N >= 0 ->
++     {F,N};
+ normalise(X) -> erlang:fault({badarg, X}).
+
+ normalise_list([H|T]) ->
