@@ -1,6 +1,6 @@
 EEP: 10
 Title: Representing Unicode characters in Erlang
-Version: $Id: unicode_in_erlang.txt,v 1.9 2008/10/03 07:31:51 pan Exp $
+Version: $Id: unicode_in_erlang.txt,v 1.10 2008/10/24 13:20:08 pan Exp $
 Last-Modified: $Date$
 Author: Patrik Nyblom
 Status: Draft
@@ -38,6 +38,12 @@ Once the representation is agreed upon, implementation can be done
 incrementally. This EEP only outlines the most basic functionality the
 system should provide. The Unicode support is by no means complete if
 this EEP is implemented, but implementation will be feasible.
+
+The EEP also suggests library functions and bit sytax to deal with
+alternative encodings. However, one *standard* encoding is suggested,
+which will be what library functions in Erlang are expected to
+support, while other representations are supported only in terms of
+conversion.
 
 Rationale
 =========
@@ -152,8 +158,7 @@ displayed incorrectly if written to a terminal set for displaying
 UTF-8 encoded Unicode and v.v. As a common example
 io:format("~s~n",[MyBinaryString]), would need to be informed about
 the fact that the string is encoded in UTF-8 or latin1 to display it
-correctly on a terminal (knowledge about the terminal is also required,
-but that won't change with the representation). 
+correctly on a terminal. 
 The formatting functions actually present a whole set of challenges
 regarding Unicode characters. New formatting controls will be needed
 to inform the formatting functions in the io and io_lib modules that 
@@ -166,13 +171,14 @@ UTF-8 advantages seem to supersede the disadvantages in the
 binary case. It therefore seems sensible to commonly encode Unicode
 characters in binaries as UTF-8. Of course any
 representation is possible, but UTF-8 would be the most common
-case.
+case and can therefore be regarded as the Erlang standard
+representation.
 
 Combinations of lists and binaries
 ---------------------------------- 
 
 To furthermore complicate things, Erlang has the concept of
-io_lists. An io_list is any (or almost any) combination of integers
+iolist's (or iodata). An io_list is any (or almost any) combination of integers
 and binaries representing a sequence of bytes, like i.e
 [[85],110,[105,[99]],111,<<100,101>>] as a
 representation of the string "Unicode". When sending data to drivers
@@ -186,9 +192,9 @@ of integers ranging from 0 to 16#10ffff and binaries with Unicode
 characters encoded as UTF-8. Converting such data to a plain list or a
 plain UTF-8 binary would be easily done as long as one knows how the
 characters are encoded to begin with. It would however not necessarily
-be an io_list. Furthermore conversion functions need to be aware of
+be an iolist. Furthermore conversion functions need to be aware of
 the original intention of the list to behave correctly. If one wants
-to convert an io_list containing latin1 characters in both list part
+to convert an iolist containing latin1 characters in both list part
 and binary part to UTF-8, the list part cannot be misinterpreted, as
 latin1 and Unicode are alike for all latin1 characters, but the binary
 part can, as latin1 characters above 127 are encoded in two bytes if
@@ -255,12 +261,12 @@ io:format, the same thing should be true i.e. ~s means latin1 mixed
 lists and ~ts means Unicode mixed lists (with binaries in
 UTF-8). Passing a list with an integer > 255 to ~s would be an error
 with this approach, just like passing the same thing to
-latin1_list_to_utf8/1. 
+latin1_list_to_utf8/1. See below for more discussions about the io system. 
 
 The unicode_list_to_utf8/1 and latin1_list_to_utf8/1 functions can be 
 combined into the single function list_to_utf8/2 like this::
 
-    characters_to_utf8(ML,Encoding) -> binary()
+    characters_to_binary(ML,Encoding) -> binary()
       ML := A mixed Unicode list or a mixed latin1 list
       Encoding := {latin1 | unicode} 
 
@@ -289,10 +295,69 @@ binaries in latin1). Extending the bit syntax to cope with UTF-8 would
 make it easy to write special conversion functions to handle those
 rare situations where the above mentioned functions cannot do the job.
 
+To accomodate other encodings, the characters_to_binary functionality
+could be extended to handle other encodings as well. A more general
+functionality could be provided with the following functions
+(preferrably placed in their own module, the module name 'unicode'
+beeing a good name-candidate):
+
+
+**characters_to_binary(ML) -> binary() | {error, Encoded, Rest} | {incomplete, Encoded, Rest}**
+
+Same as characters_to_binary(ML,unicode,unicode).
+
+**characters_to_binary(ML,InEncoding) -> binary() | {error, Encoded, Rest} | {incomplete, Encoded, Rest}**
+
+Same as characters_to_binary(ML,InEncoding,unicode).
+
+**characters_to_binary(ML,InEncoding, OutEncoding) -> binary() | {error, Encoded, Rest} | {incomplete, Encoded, Rest}**
+
+Types:
+
+- ML := A mixed list of integers or binaries corresponding to the
+        InEncoding or a binary in the InEncoding
+- InEncoding := { latin1 | unicode | utf8 | utf16 | utf32 }
+- OutEncoding := { latin1 | unicode | utf8 | utf16 | utf32 }
+- Encoded := binary()
+- Rest := Mixed list as specified for ML.
+
+The option 'unicode' is an alias for utf8, as this is the
+preferred encoding for unicode characters in binaries. Error tuples
+are returned when the data cannot be encoded/decoded due to errors
+in indata and incomplete tuples when the indata is possibly correct
+but truncated.
+
+**characters_to_list(ML) -> list() | {error, Encoded, Rest} | {incomplete, Encoded, Rest}**
+
+Same as characters_to_list(ML,unicode).
+
+**characters_to_list(ML,InEncoding) -> list() | {error, Encoded, Rest} | {incomplete, Encoded, Rest}**
+
+Types:  
+
+- ML := A mixed list of integers or binaries corresponding to the
+        InEncoding or a binary in the InEncoding
+- InEncoding := { latin1 | unicode | utf8 | utf16 | utf32 }
+- Encoded := list()
+- Rest := Mixed list as specified for ML.
+
+Here also the option 'unicode' denotes the default Erlang encoding
+of utf8 in binaries and is therefore an alias for utf8. Error- and
+incomplete-tuples ase returned in the same way as for
+characters_to_binary.
+
+Note that as the datatypes returned upon success are well defined,
+guard tests exist (is_list/1 and is_binary/1), why i suggest not
+returning the clunky {ok, Data} tuples even though the error and
+incomplete tuples can be returned. This makes the functions simpler to
+use when the encoding is known to be correct while return values can
+still be checked easilly.
+
+
 Bit syntax
 ----------
 
-Using erlang bit syntax on binaries containing Unicode characters
+Using Erlang bit syntax on binaries containing Unicode characters
 in UTF-8 could be facilitated by a new type. The type name utf8 would
 be preferable to utf-8, as dashes ("-") have special meaning in bit
 syntax separating type, signedness, endianess and units.
@@ -305,15 +370,16 @@ rest of the bit syntax matching expression.
 When constructing binaries, an integer converted to UTF-8 could
 consequently occupy between one and four bytes in the resulting binary.
 
-As bit syntax is often used to interpret data from various external sources,
-it would be useful to have a corresponding utf16 type as well. Both
-UTF-8 and UTF-16 is easily interpreted with the current bit syntax
-implementation, but the suggested specific types would be convenient for
-the programmer. UTF-32 need no special bit syntax addition, as every
-character is simply encoded as exactly one 32-bit number. 
+As bit syntax is often used to interpret data from various external
+sources, it would be useful to have corresponding utf16 and utf32
+types as well. While UTF-8 and UTF-16 and UTF-32 is easily interpreted
+with the current bit syntax implementation, the suggested specific
+types would be convenient for the programmer. Also Unicode imposes
+restrictions in terms of range and has some forbidden ranges which are best
+handled using a built in bit syntax type.
 
-The utf16 type need to have an endianess option, as UTF-16 can be stored in
-big or little endian entities.
+The utf16 and utf32 types need to have an endianess option, as UTF-16
+and UTF-32 can be stored as big or little endian entities.
 
 Formatting functions
 --------------------
@@ -332,185 +398,58 @@ like e.g. "p" or even "w", while a new single control character for
 Unicode strings would only be a replacement for the current "s"
 control character.
 
-The io-protocol in Erlang is built around an assumption that data is
-always a stream of bytes, needing no translation regardless of the
-output device. This means that a latin1 string can be sent to a
-terminal or a file in much the same way, there will never be any
-conversion needed. This might not always hold for terminals, but in
-case of terminals there is always one single conversion needed, namely
-that from the byte-stream to whatever the terminal likes. A disk-file
-is a stream of bytes as well as a terminal is, at least as far as the
-Erlang io-system is concerned. Furthermore the io_lib formatting
-function always returns (possibly) deep lists of integers, each
-representing one character, making it hard to differentiate between
-different encodings. The result is then sent as is by functions like
-io:format to the io_server where it is finally put on the disk. The
-servers also accept binaries, but they are never produced by
-io_lib:format.
+Although the io-protocol in Erlang from the beginning did not impose
+any limit on what characters could be transferred between a client and
+an io_server, demands for better performance
+from the io-system in Erlang has made later
+implementations use binaries for communication, which in practice has
+made the io-protocol contain bytes, not general characters.
+
+Futhermore has the fact that the io-system currently works with
+characters that can be represented as bytes been utilized in numerous
+applications, so that output from io-functions (i.e. io_lib:format)
+has been sent directly to entities only accepting byte input (like
+sockets) or that io_servers have been implemented assuming only
+character ranges of 0 - 255. Of course this can be changed, but such a
+change might include lower performance from the io-system as well as
+large changes to code already in production (aka "customer code").
+
+The io-system in Erlang currently works around an assumption that data
+is always a stream of bytes. Although this was not the original
+intention, this is how it's today used. This means that a latin1
+string can be sent to a terminal or a file in much the same way, there
+will never be any conversion needed. This might not always hold for
+terminals, but in case of terminals there is always one single
+conversion needed, namely that from the byte-stream to whatever the
+terminal likes. A disk-file is a stream of bytes as well as a terminal
+is, at least as far as the Erlang io-system is concerned. Furthermore
+the io_lib formatting function always returns (possibly) deep lists of
+integers, each representing one character, making it hard to
+differentiate between different encodings. The result is then sent as
+is by functions like io:format to the io_server where it is finally
+put on the disk. The servers also accept binaries, but they are never
+produced by io_lib:format.
 
 When Erlang starts supporting Unicode characters, the world changes a
 little. A file might contain text in UTF-8 or in iso-latin-1 and there is
 no telling from the list produced by e.g io_lib:format
-what the user originally intended. One could make this a property of the file,
-telling that all characters (> 127) should be converted to UTF-8
-when writing and from UTF-8 when reading. One could also differentiate
-between already converted entities and non converted entities when formatting.
-
-Alternative 1 - files are tagged for conversion to and from UTF-8
-.................................................................
-
-This could be done by giving a flag when opening a file e.g::
-
-    UniString = [1050,1072,1082,1074,
-                 1086,32,1077,32,85,110,105,99,111,100,101,32,63],
-    {ok,File} = file:open(Name,[write,utf8]),
-    io:format(File,"~ts~n",[UniString]),
-    ...
-
-Now io:format could continue to produce a list of integers (as it does
-today) and would then send a possibly deep list of Unicode characters
-to the actual io-server (the part of the Erlang system that actually
-knows something about the device). The io-server would know that the
-file is supposed to contain UTF-8 and would convert the data to
-UTF-8-bytes before actually writing them on the disk. The difference
-lies in that the io-protocol no longer deals with bytes but with
-characters, but operations like::
-
-            lists:flatten(io_lib:format("~ts",[UniString])
-
-would behave as expected, the list produced would not contain bytes,
-but well Unicode characters.
-
-Writing to a terminal, the same thing happens if the terminal is a
-UTF-8 device. Prior to actually outputting the characters to the
-device, all data is converted to UTF-8 and will be displayed
-correctly. If the terminal device only handles latin1, the Unicode
-characters < 256 can be displayed and others have to be encoded in
-some other human readable form (like U+NNNN or something like that).
-
-One downside with keeping the UTF-8 conversion as a property of the
-file itself, is that the lists used in the Erlang io-system no longer are valid
-for output on any file or device. If the file was not opened to
-contain UTF-8 text, an error will be generated as the data contains
-integers > 255. The output of io_lib:format can not generally be sent
-to an Erlang driver either, the conversion when sending the data onto the net
-has to be done manually, or a special mode for drivers have to be
-added.
-
-Another downside is that all bytes > 127 would be converted on such
-a file. This is OK for a terminal, but a file might mix binary data
-and Unicode text, in which case the file has to be opened without the
-option of UTF-8 conversion and any UTF-8 data has to be converted to
-UTF-8 bytes (a binary would be appropriate).
-
-Alternative 2 - data is always bytes, but types of data is distinguishable
-..........................................................................
-
-The basic idea of the Erlang io-system is, as said earlier, that there
-is only one type of data, namely bytes. Now, with Unicode we have
-conceptually two types of data, textual data, which may or may not be
-bytes and may or may not need translation on output/input, and binary
-data, which should not be translated.
-
-For a disk file, it would be preferable if all data was translated to
-bytes by the user program prior to sending it to the io_server, but
-for terminals, everything needs to be translated into a human readable
-form and a character > 127 should be output as either UTF-8,
-iso-latin-1 or an escape code depending on the capabilities of the
-terminal device. Even if everything is bytes, the bytes are not all
-equal to the terminal io_server. Having the user program deal with
-this is not a nice option, terminal capabilities need to be handled by
-the user program and new interfaces to gain low level access to the
-terminal characteristics have to be added.
-
-If the formatting functions simply generated UTF-8 for Unicode strings
-and iso-latin-1 data for non-Unicode strings, that would suffice for
-the disk files, the io-system would stay more or less untouched and we'd
-still work with bytes. To the terminal however, strings output as
-Unicode and strings output as iso-latin-1 need to be distinguishable,
-as one or the other might need translation prior to displaying on the
-actual terminal device. 
-
-Most natural would be to tag data, saying that the following bytes
-represent Unicode characters or represent iso-latin-1 characters using
-i.e. a tuple with tag and data. This would unfortunately break almost
-everything in the current io-system. The iodata() datatype would need to
-be extended and almost the whole of the io-system be rewritten,
-including each and every io_server. All the downsides of sending
-Unicode characters as large integers in the io-system would also
-remain from the other solution. 
-
-If one however instead let io_lib:format return binaries for Unicode
-strings and integers for iso-latin-1 data and propagate this all the
-way to the io_server, the terminal io_server could use the implicit
-information embedded in the actual primitive datatype and the same
-problems as with explicitly tagged data will not arise. Data will
-still be of the type iodata(), it could still be sent to whatever
-file, network socket or other device required and except for the
-terminal devices, no one need to bother. This however introduces an
-implicit meaning to binaries sent to a terminal device, but the
-meaning is special only to terminal devices, other io_servers can
-ignore it.
-
-io_lib:format could produce UTF-8 binaries for all Unicode input, so that::
-
-          io_lib:format("~ts",[UniString])
-
-would produce a binary for the UniString, but:: 
-      
-          io_lib:format("~s",[Latin1String])
-
-would produce the list of bytes-as-integers it does today.
-
-An io_server that is connected to a terminal would know that the
-binaries should stay untouched while the integers might need
-conversion. An io_server connected to a disk file would not need to do
-anything. The data sent to the io_server is always bytes and the data
-can be sent as is on the net or to a driver. The output of
-io_lib:format is simply a valid iolist().
-
-The downside is of course that::
-
-    lists:flatten(io_lib:format("~ts",[UniString]))
-
-no longer behaves as expected, but as the format modifier "t" is new, this 
-would not break old code. To get a Unicode string one should instead use:
-
-    erlang:characters_to_list(io_lib:format("~ts",[UniString]),unicode)
-
-Another downside is that iolist()'s produced with other means than by
-using io_lib:format and then sent to the terminal by
-i.e. io:put_chars() might be interpreted as containing binaries which
-are already in UTF-8 when they in fact are read from a latin1 file or
-produced in some other way. This is the effect of the binary
-datatype getting an implicit meaning in the io-system (or rather, a
-special meaning to terminal files). However the case of displaying raw
-iodata() on a terminal is rare. Most output is done through the
-formatting functions.
-
-The big downside is of course that this solution is somewhat of a
-kludge, giving implicit meaning to binaries for terminal devices to
-interpret.
+what the user originally intended. 
 
 Suggested solution
 ...................
 
-Even though the first alternative seems cleaner than the second, the
-second mostly affects terminals and keeps the rest of the system
-backward compatible. I (somewhat unwillingly) have to conclude that the
-second alternative is the most feasible and the one we'll have to
-choose to break as little code as possible. Some programs might
-display strange characters on unexpected terminal devices, but that is
-unfortunately nothing new to programmers dealing with character sets
-different than US ASCII. The most important thing is that disk or
-network files behave as expected, and that will still be the case with
-this solution.
+To make a solution that as far as possible does not break current code
+and also keeps (or reverts to) the original intention of the
+io-system protocol, I suggest a scheme where the formatting functions
+that return lists, keep to the current behaviour except when the
+translation-modifier is used, in which case binaries in UTF-8 encoding
+are returned.
 
-
-I therefore suggest that the definition of io_lib:format is changed so
-that the "t" modifier generates binaries from whatever unicode data
-there is in the term, but formatting without the "t" modifier keeps
-generating bytes as integers.Going back to the Bulgarian string
+So the io_lib:format function returns a (possibly deep)
+list of integers (latin1, which can be viewed as a subset of Unicode)
+if used without translation modifiers. If the translation modifiers
+are used, it will however return a mixed list as those handled by my
+suggested conversion routines. Going back to the Bulgarian string
 (ex1_), let's look at the following::
 
     1> UniString = [1050,1072,1082,1074,
@@ -528,18 +467,20 @@ the other hand::
     [[<<208,154,208,176,208,186,208,178,208,190,32,208,181,32,
         85,110,105,99,111,100,101,32,63>>]]   
 
-\- which up until now could not happen. This is still a list of bytes, but one where the terminal io_server can distinguish between already translated data and non translates. Likewise, the binary containing the UTF-8
-representation of UniString would generate the same list::
 
-    4> UniBin = <<208,154,208,176,208,186,208,178,208,190,32,208,181,32,
-                  85,110,105,99,111,100,101,32,63>>.
-    5> io_lib:format("~ts",[UniBin]).
-    [[<<208,154,208,176,208,186,208,178,208,190,32,208,181,32,
-        85,110,105,99,111,100,101,32,63>>]]
+The downside of introducing binaries is of course that::
 
-\- any other behavior would be confusing and/or incompatible. 
+    lists:flatten(io_lib:format("~ts",[UniString]))
 
-io:format would have to generate similar iolists()'s and send them directly. As before, directly formatting (with ~s) a list of characters > 255 would be an error, but with the "t" modifier it would work.  
+no longer behaves as expected, but as the format modifier "t" is new, this 
+would not break old code. To get a Unicode string one should instead use::
+
+    unicode:characters_to_list(io_lib:format("~ts",[UniString]),unicode)
+
+As before, directly formatting (with ~s) a list of characters > 255
+would be an error, but with the "t" modifier it would work.
+
+When it comes to range checking and backward compatibility::  
 
     6> io:format(File,"~s",[UniString]).
 
@@ -557,29 +498,199 @@ The corresponding behavior of io:fread/2,3 would be to expect unicode data in th
 
     12> io:fread(File,'',"~s").
 
-If io:fread reads from a terminal device (connected via the Erlang
-terminal driver) however, input should always be expected to be able to be in
-unicode and the only difference between "~s" and "~ts" would be that
-"~s" should not accept UTF-8 sequences that result in character codes
-> 255.
+The actual io-protocol, on the other hand, should deal only with
+Unicode, meaning that when data is converted to binaries for sending,
+all data should be transflated into UTF-8. When lists of integers are
+used in communication, the latin1 and unicode representations are the
+same, why no conversion or restrictions apply. Recall that the
+io-system is built so that characters should have one translation
+regardless of the io-server. The only possible encoding would be a
+Unicode one.
 
-Correspondingly, I suggest that the automatic formatting of list
-sequences as strings by ~p stays limited to latin1
-strings, as a lot of false positives would be generated by guessing if
-a list is a Unicode string.
+As we are communicating heavily between processes (the client and
+server processes in the io-system), converting the data to Unicode
+binaries (UTF-8) is the most efficient strategy for larger amounts of
+data.
 
-The "t" modifier to ~p could be used here as well, to heuristically
-format Unicode strings in terms. 
+Generally, writing
+to an io-server using the file-module will only be possible with
+byte-oriented data, while using the io-module will work on unicode
+characters. Calling the function file\:write/2 will send the bytes to
+the file as is, as files are byte-oriented, but when writing on a file
+using the io-module, unicode characters are expected and handled.
 
-As can be seen when dealing with formatting, a default (expected)
-representation of Unicode in both lists and binaries is essential.
-Imagine the complexity if different encodings (e.g. UTF-16 and UTF-32
-in binaries or UTF-8 in lists) would have to be supported as well.
+The io-protocol will make conversons of bytes into unicode when
+sending to io-servers, but if the file is byte-oriented, the
+conversion back will make this transparent to the user. All bytes are
+representable in UTF-8 and can be converted back and forth without hassle.
 
-On a lower level (like bit syntax), support for other encodings like
-UTF-16, would be usable though, as there are a number of protocols
-using UTF-16 and UTF-32 encoding. As an example, Corba IOP encoding accepts
-all three encodings.
+The incompatible change will have to be to the put_chars function in
+io. It should only allow unicode data, not iodata() as it is
+documented to do now. The big change beeing that any binaries provided
+to the function need to be in UTF-8. However, most usage of this
+function is restricted to lists, why this incompatible change not is
+expected to cause trouble for users.
+
+To handle possible unicode text data on a file, one should be able to
+provide encoding parameters when opening a file. A file should by
+default be opened for byte (or latin1) encoding, while the option to
+open it for i.e. utf8 translation should be available.
+
+Lets look at some examples:
+
+Example 1 - common byte-oriented reading
+........................................
+
+A file is opened as usual with file\:open. We then want to write bytes
+to it:
+
+- Using file\:write with iodata() (bytes), the data is converted into
+  UTF-8 by the io-protocol, but the io-server will convert it back to
+  latin1 before actually putting the bytes on file. For better
+  performance, the file could be opened in raw mode, avoiding all
+  conversion.
+
+- Using file\:write with data already converted to UTF-8 by the user,
+  the io-protocol will embed this in yet another layer of UTF-8
+  encoding, the file-server will unpack it and we will end up with the
+  UTF-8 bytes written to the file as expected.
+
+- Using io:put_chars, the io-server will return an error if any of the
+  unicode characters sent are not possible to represent in one
+  byte. Characters representable in latin1 will however be written
+  nicely even though they might be encoded as UTF-8 in binaries sent
+  to io:put_chars. As long ars the io_lib:format function is used
+  without the translation-modifier, everything will be valid latin1
+  and all return values will be lists, why it is both valid Unicode *and*
+  possible to write on a default file. Old code will function as
+  before, except when feeding io:put_chars with latin1 binaries, in
+  that case the call should be exchanged for a file\:write call.
+
+Example 2 - Unicode-orinted writing
+...................................
+
+A file is opened using a parameter telling that unicode data should be
+written in a defined encoding, in this case we'll select UTF-16/bigendian to
+avoid mixups with the native UTF-8 encoding. We open the file with
+file\:open(Name,[write,{encoding,utf16,bigendian}]). 
+
+- Using file\:write with iodata(), the io-protocol will convert into
+  the default unicode representation (UTF-8) and send the data to the
+  io-server, which will in turn convert the data to UTF-16 and put it
+  on the file. The file is to be regarded as a text file and all
+  iodata() sent to it will be regarded as text.
+
+- If the data is already in unicode representation (say UTF-8) it
+  should not be written to this type of file using file\:write,
+  io:put_chars is expected to be used (which is not a problem as
+  unicode data should not exist in old code and this is only a problem
+  when the file is opened to translate).
+
+- If the data is in the Erlang default Unicode format, it can be
+  written to the file using io:put_chars. This works for all types of
+  lists with integers and for binaries in UTF-8, for other
+  representations (most notably latin1 in binaries) the data should be
+  converted using unicode:characters_to_XXX(Data,latin1) prior to
+  sending. For latin1 mixed lists (iodata()), file\:write can also be
+  used directly.
+
+To sum up this case - unicode strings (including latin1 lists) are
+written to a converting file using io:put_chars, but pure iodata() can
+also be implicitly converted to the encoding by using file\:write.
+
+Example 3 - raw writing
+.......................
+
+A file opened for raw access will only handle bytes, it cannot be used
+together with io:put_chars.
+
+- Data formatted with io_lib:format can still be written to a raw file
+  using file\:write. The data will end up beeing written as is. If the
+  translation modifier is consequently used when formatting, the file
+  will get the native UTF-8 encoding, if no translation modifiers are
+  used, the file will have latin1 encoding (each character in the list
+  returned from io_lib:format will be representable as a latin1
+  byte). If data is generated in different ways, the conversion
+  functions will have to be used.
+
+- Data written with file\:write will be put on the file directly, no
+  conversion to and from Unicode representation will happen.
+
+Example 4 - byte-oriented reading
+.................................
+
+When a file is opened for reading, much the same things apply as for
+writing.
+
+- file\:read on any file will expect the io-protocol to deliver data as
+  Unicode. Each byte will be converted to unicode by the io_server and
+  turned back to a byte by file\:read
+
+- If the file actually contains unicode characters, they will bytewise
+  be converted to unicode and then bach, giving file\:read the
+  original encoding. If read as (or converted to) binaries they can
+  then easilly be converted back to the Erlang default representation
+  by means of the conversion routines.
+
+- If the file is read with io:get_chars, all characters will be
+  returned in a list as expected. All characters will be latin1, but
+  that is a subset of unicode and there will be no difference to
+  reading a translating file. If the file however contains unicode
+  converted characters and is read in this way, the return value from
+  io:get_chars will be hard to interpret, but that is to be
+  expected. If such a functionality is desired, the list can be
+  converted to a binary with list_to_binary and then explored as a
+  unicode entity in the encoding the file actually has.
+
+Example 5 - Unicode file reading
+................................
+
+As when writing, reading unicode converting files is best done with
+the io-module. Let's once again assume UTF-16 on the file.
+
+- When reading using file\:read, the UTF-16 data will be converted into
+  a unicode representation native to Erlang and sent to the
+  client. If the client is using file\:read, it will translate the data
+  back to bytes in the same way as bytes where translated to unicode
+  for the protocol when writing. Is everything representable as bytes,
+  the function will succeed, but if any unicode character larger than
+  255 is present, the function will fail with a decoding error.
+
+- Unicode data in the range over codepoint 255 can not be retrieved by
+  use of the file-module. The io-module should be used instead.
+
+- io:get_chars and io:get_line will work on the unicode data provided
+  by the io-protocol. All unicode returns will be as unicode lists as
+  expected. The fread function will return UTF-8 encoded binaries only
+  when the translation modifier is supplied.
+
+Example 6 - raw reading
+.......................
+
+As with writing, only the file module can be used and only byte
+oriented data is read. If encoded, The encoding will remain when
+reading and writing.
+
+
+Conclusions from the examples
+.............................
+
+With this solution, the file module is consistent with latin1
+io_servers (aka common files) and raw files. A file type, a translating
+file, is added for the io-module to be able to get implicit conversion
+of it's Unicode data (another example of such an io_server with
+implicit conversion would of course be the
+terminal). Interface-wise,common files behave as before and we only
+get added functionality. 
+
+The downsides are the subtly changed behaviour of io:put_chars and the
+performance impact by the conversion to and from Unicode
+representations when using the file module on non-raw files with
+default (latin1/byte) encoding. The latter may be possible to change
+by extending the io-protocol to tag whole chunks of data as bytes
+(latin1) or unicode, but using raw files for writing large amounts of
+data is often the better solution in those cases.
+
 
 Specification
 =============
@@ -594,20 +705,13 @@ Unicode entities a combination of those.
 Conversion to and from latin1 and UTF-8
 ---------------------------------------
 
-I also suggest the BIFs characters_to_list/2 and characters_to_utf8/2 as a
-minimal set of functions to deal with the conversion to and from UTF-8
-encoded characters in binaries and mixed Unicode lists::
+I also suggest a module 'unicode', containing functions for
+converting between representations of unicode. The default format for
+all functions should be utf8 in binaries to point out this as the
+preferred internal representation of unicode characters in binaries. 
 
-    characters_to_utf8(ML,Encoding) -> Bin
-      ML := Any possibly deep list of integers or binaries valid for the input encoding.
-      Encoding := {latin1 | unicode} , the input encoding
-      Bin := binary() containing UTF-8 encoded characters.
-
-    characters_to_list(ML,Encoding) -> List
-      ML := Any possibly deep list of integers or binaries valid for the input encoding.
-      Encoding := {latin1 | unicode}, the input encoding 
-      List := list() containing unicode characters as integers.
-
+The two main conversion functions should be characters_to_binary/3 and
+characters_to_list/2 as described above.
 
 Bit syntax
 ----------
@@ -625,8 +729,9 @@ Optionally UTF-16 could be supported in a similar way for binaries, e.g::
 
     <<Ch/utf16-little,_/binary>> = BinString
 
-UTF-32 support will not require a new type as the fixed width of UTF-32 makes
-current bit syntax sufficient.
+UTF-32 will need to be supported in a similar way as UTF-16, both for
+completeness and for the range-checking that will be involved when
+converting unicode characters.
 
 Formatting
 ----------
@@ -634,12 +739,16 @@ Formatting
 I finally suggest the "t" modifier to control sequence in the
 formatting function, which expects mixed lists of integers
 0..16#10ffff and binaries with UTF-8 coded Unicode characters. The
-function io:format should on a terminal cope with displaying the
-characters properly by sending binaries for unicode data but integers
-for latin1 ditto. 
+functions in  io and io_lib will retain their current
+functionality for code not using the translation modifier, but will
+return UTF-8 binaries when ordered to.  
 
 The fread function should in the same way accept unicode data only
 when the "t" modifier is used.
+
+The io-protocol need to be changed o always handle Unicode characters.
+Options given when opening a file will allow for implicit conversion of
+text files.
 
 References
 ==========
