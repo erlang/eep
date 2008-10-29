@@ -46,7 +46,7 @@ Numerical Index
  S          21  Optional trailing commas for lists and tuples  Richard A. O'Keefe
  S          22  Range checking for binaries                    Richard A. O'Keefe
  S          23  Allow variables in fun M:F/A                   Richard A. O'Keefe
- S          24  Functions may be named using F/N in all        Richard A. O'Keefe
+ SF/R12B-5  24  Functions may be named using F/N in all        Richard A. O'Keefe
                 module attributes
 
 Key
@@ -62,6 +62,7 @@ Key
     /R12B-0  - Proposal is implemented in OTP release R12B-0
     /R12B-3u - Proposal is implemented in OTP release R12B-3,
                except for Unicode support according to EEP 10
+    /R12B-5  - Proposal is implemented in OTP release R12B-5
 
 Owners
 
