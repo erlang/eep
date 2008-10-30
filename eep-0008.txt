@@ -27,7 +27,7 @@ more information for bug detection tools such as Dialyzer, and can be
 exploited by documentation tools such as Edoc for generating program
 documentation of various forms. It is expected that the type language
 described in this document will supersede and eventually replace the
-purely comment-based type language currently used by Edoc.
+purely comment-based @type and @spec declarations used by Edoc.
 
 
 
@@ -112,8 +112,8 @@ The set of predefined types and the syntax for types is given below::
 
 
 Because lists are commonly used, they have shorthand type notations.
-The type ``list(T)`` has the shorthand ``[T]``. The shorthand ``[T,...]`` stands
-for the set of non-empty proper lists whose elements are of type ``T``.
+The type ``list(T)`` has the shorthand ``[T]``. The shorthand ``[T,...]``
+stands for the set of non-empty proper lists whose elements are of type ``T``.
 The only difference between the two shorthands is that ``[T]`` may be an
 empty list but ``[T,...]`` may not.
 
@@ -128,6 +128,7 @@ table. (Some type unions below slightly abuse the syntax of types.)
     ==========================  =====================================
           Built-in type                   Stands for
     ==========================  =====================================
+    ``term()``                  ``any()``
     ``bool()``                  ``'false' | 'true'``
     ``byte()``                  ``0..255``
     ``char()``                  ``0..16#10ffff``
@@ -143,13 +144,18 @@ table. (Some type unions below slightly abuse the syntax of types.)
     ``iolist()``                ``maybe_improper_list(``
                                     ``char() | binary() |``
                                     ``iolist(), binary() | [])``
+    ``module()``                ``atom()``
     ``mfa()``                   ``{atom(),atom(),byte()}``
+    ``node()``                  ``atom()``
+    ``timeout()``               ``'infinity' | non_neg_integer()``
     ``no_return()``             ``none()``
     ==========================  =====================================
 
 Users are not allowed to define types with the same names as the
-predefined or built-in ones.  This is checked by the compiler and its
-violation results in a compilation error.
+predefined or built-in ones. This is checked by the compiler and its
+violation results in a compilation error. (For bootstrapping purposes,
+it can also result to just a warning if this involves a built-in type
+which has just been introduced.)
 
     *NOTE*: The following built-in list types also exist, but they are
     expected to be rarely used. Hence, they have long names:
@@ -184,7 +190,7 @@ As seen, the basic syntax of a type is an atom followed by closed
 parentheses. New types are declared using ``'type'`` compiler attributes
 as in the following::
 
-    -type(my_type() :: Type).
+    -type my_type() :: Type.
 
 where the type name is an atom (``'my_type'`` in the above) followed by
 parenthesis. Type is a type as defined in the previous section. A
@@ -202,7 +208,7 @@ Erlang variables (starts with an upper case letter). Naturally, these
 variables can - and should - appear on the RHS of the definition.
 A concrete example appears below::
 
-    -type(orddict(Key, Val) :: [{Key, Val}]).
+    -type orddict(Key, Val) :: [{Key, Val}].
 
 
 Type information in record declarations
@@ -260,7 +266,7 @@ Specifications (contracts) for functions
 A contract (or specification) for a function is given using the new
 compiler attribute ``'spec'``. The basic format is as follows::
 
-    -spec(Module:Function/N :: (ArgType1, ..., ArgTypeN) -> ReturnType).
+    -spec Module:Function(ArgType1, ..., ArgTypeN) -> ReturnType.
 
 The arity of the function has to match the number of arguments, or
 else a compilation error occurs.
@@ -272,38 +278,38 @@ functions.
 
 For most uses within a given module, the following shorthand is allowed::
 
-    -spec(Function/N :: (ArgType1, ..., ArgTypeN) -> ReturnType).
+    -spec Function(ArgType1, ..., ArgTypeN) -> ReturnType.
 
 Also, for documentation purposes, argument names can be given::
 
-    -spec(Function/N :: (ArgName1 :: Type1, ..., ArgNameN :: TypeN) -> RT).
+    -spec Function(ArgName1 :: Type1, ..., ArgNameN :: TypeN) -> RT.
 
 A function specification can be overloaded. That is, it can have
 several types, separated by a semicolon (;)::
 
-    -spec(f/2 :: (T1, T2) -> T3
-               ; (T4, T5) -> T6).
+    -spec foo(T1, T2) -> T3
+           ; (T4, T5) -> T6.
 
 A current restriction, which currently results in a warning (*OBS*: not
 an error) by the compiler, is that the domains of the argument types
 cannot be overlapping. For example, the following specification
 results in a warning::
 
-    -spec(f/1 :: (pos_integer()) -> pos_integer()
-               ; (integer()) -> integer()).
+    -spec foo(pos_integer()) -> pos_integer()
+           ; (integer()) -> integer().
 
 Type variables can be used in specifications to specify relations for
 the input and output arguments of a function. For example, the
 following specification defines the type of a polymorphic identity
 function::
 
-    -spec(id/1 :: (X) -> X).
+    -spec id(X) -> X.
 
 However, note that the above specification does not restrict the input
 and output type in any way. We can constrain these types by guard-like
 subtype constraints::
 
-    -spec(id/1 :: (X) -> X when is_subtype(X, tuple())).
+    -spec id(X) -> X when is_subtype(X, tuple()).
 
 and provide bounded quantification. Currently, the ``is_subtype/2`` guard
 is the only guard which can be used in a ``'spec'`` attribute.
@@ -313,8 +319,8 @@ specification after which it appears. To avoid confusion, we suggest
 that different variables are used in different constituents of an
 overloaded contract as in the example below::
 
-    -spec(f/1 :: ({X, integer()}) -> X when is_subtype(X, atom())
-               ; ([Y]) -> Y when is_subtype(Y, number())).
+    -spec foo({X, integer()}) -> X when is_subtype(X, atom())
+           ; ([Y]) -> Y when is_subtype(Y, number()).
 
 
 Some functions in Erlang are not meant to return; either because they
@@ -326,7 +332,7 @@ function below::
 For such functions we recommend the use of the special ``no_return()``
 type for their "return", via a contract of the form::
 
-    -spec(my_error/1 :: (any()) -> no_return()).
+    -spec my_error(term()) -> no_return().
 
 
 Current limitations
@@ -349,4 +355,3 @@ This document has been placed in the public domain.
    fill-column: 70
    coding: utf-8
    End:
-
