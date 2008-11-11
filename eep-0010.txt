@@ -1,6 +1,6 @@
 EEP: 10
 Title: Representing Unicode characters in Erlang
-Version: $Id: unicode_in_erlang.txt,v 1.10 2008/10/24 13:20:08 pan Exp $
+Version: $Id: unicode_in_erlang.txt,v 1.11 2008/11/11 10:12:28 pan Exp pan $
 Last-Modified: $Date$
 Author: Patrik Nyblom
 Status: Draft
@@ -229,22 +229,22 @@ the system as list_to_binary, binary_to_list, and iolist_to_binary.
 Conversion between Unicode lists, Unicode binaries, and from
 mixed Unicode lists could in a similar way be provided by functions like::
 
-    unicode_list_to_utf8(UM) -> Bin
+    unicode:list_to_utf8(UM) -> Bin
 
 Where UM is a mixed Unicode list and the result is a UTF-8 binary, and::
 
-    utf8_to_list(Bin) -> UL
+    unicode:utf8_to_list(Bin) -> UL
 
 Where Bin is a binary consisting of unicode characters encoded as
 UTF-8 and UL is a plain list of unicode characters.
 
 To allow for conversion to and from latin1 the functions::
 
-    latin1_list_to_utf8(LM) -> Bin
+    unicode:latin1_list_to_utf8(LM) -> Bin
 
 and::
 
-    latin1_list_to_list(LM) -> UL
+    unicode:latin1_list_to_list(LM) -> UL
 
 would do the same job. Actually latin1_list_to_list is not necessary
 in this context, as it is more of a iolist-function, but should be 
@@ -266,9 +266,9 @@ latin1_list_to_utf8/1. See below for more discussions about the io system.
 The unicode_list_to_utf8/1 and latin1_list_to_utf8/1 functions can be 
 combined into the single function list_to_utf8/2 like this::
 
-    characters_to_binary(ML,Encoding) -> binary()
+    unicode:characters_to_binary(ML,InEncoding) -> binary()
       ML := A mixed Unicode list or a mixed latin1 list
-      Encoding := {latin1 | unicode} 
+      InEncoding := {latin1 | unicode} 
 
 The word "characters" is used to denote a possibly complex
 representation of characters in the encoding concerned, like a short
@@ -281,14 +281,14 @@ list would be an error. Giving unicode as the encoding would mean that
 all integers 0..16#10ffff are accepted and the binaries are expected
 to already be UTF-8 coded.
 
-In the same way, conversion to lists of unicode characters could be done with a function:
+In the same way, conversion to lists of unicode characters could be done with a function::
 
-    characters_to_list(ML, Encoding) -> list() 
+    unicode:characters_to_list(ML, InEncoding) -> list() 
         ML := A mixed Unicode list or a mixed latin1 list
-        Encoding := {latin1 | unicode} 
+        InEncoding := {latin1 | unicode} 
 
 I think the approach of two simple conversion functions
-characters_to_utf8/2 and characters_to_list/2 is attractive, despite the fact
+characters_to_binary/2 and characters_to_list/2 is attractive, despite the fact
 that certain combinations of in-data would be somewhat harder to
 convert (e.g. combinations of unicode characters > 255 in a list with
 binaries in latin1). Extending the bit syntax to cope with UTF-8 would
