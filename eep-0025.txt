@@ -1,0 +1,197 @@
+EEP: 25
+Title: Unnesting cases
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 28-Nov-2008
+Post-History:
+
+
+
+Abstract
+
+    Erlang 'case' expressions should adopt/adapt an idea from
+    Algol 68 that in Erlang would strictly generalise 'cond'.
+
+
+
+Specification
+
+    Currently a 'case' expression has the form
+
+	'case' Expression 'of'
+	      Pattern ['when' Guard] '->' Expression
+         {';' Pattern ['when' Guard] '->' Expression}...
+	'end'
+
+    It is well known that Algol 68 had
+	if .. then .. {elif .. then ..}... [else ..] fi
+    expressions.  It is less well known that it had a similar
+    construction for case expression,
+	case .. in ... {ouse .. in ..}... [out ..] esac
+    where "ouse" (from "OUt caSE") let you iterate the case
+    matching process and only need one 'esac'.
+
+    This proposal adopts the Algol 68 idea.
+    The revised form is
+
+	'case' Expression 'of'
+	      Pattern ['when' Guard] '->' Expression
+         {';' Pattern ['when' Guard] '->' Expression}...
+	{';' 'or' 'case' Expression 'of'	
+	      Pattern ['when' Guard] '->' Expression
+         {';' Pattern ['when' Guard] '->' Expression}...}...
+	'end'
+
+
+
+Motivation
+
+    Consider this example:
+
+    suffix(P, Suffix, List)
+      when is_function(P, 2), is_list(Suffix) ->
+	suffix_loop(P, Suffix, List).
+
+    suffix_loop(P, Suffix, List) ->
+	case equal(P, Suffix, List)
+	  of true  -> true
+	   ; false -> case List
+			of [_|Tail] -> suffix_loop(P, Suffix, Tail)
+			 ; []       -> false
+		      end
+	end.
+
+    With this proposal we could write
+
+    suffix_loop(P, Suffix, List) ->
+	case equal(P, Suffix, List)
+	  of true     -> true
+	; or case List
+          of [_|Tail] -> suffix_loop(P, Suffix, Tail)
+	   ; []       -> false
+	end.
+	   
+    where all the alternatives to be selected have the same
+    indentation.
+
+    The old proposal for a Lisp-like 'cond' is no longer really
+    needed.  Instead of
+
+	cond
+	    C1 -> B1
+          ; C2 -> B2
+          ...
+          ; Cn -> Bn
+	end
+
+    one writes
+
+	case      C1 of true -> B1
+	; or case C2 of true -> B2
+	...
+	; or case Cn of true -> Bn
+	end
+
+    What one loses here is the check that a result that is not
+    'true' must be 'false', but that job can these days be done
+    by the Dialyzer.  This is certainly clumsier than 'cond',
+    but it achieves the main aim, that of selecting from a bunch
+    of choices at the same logical (and therefore at the same
+    indentation) level by means of a series of Boolean-valued
+    expressions, but it is strictly more general.  It allows you
+    to combine Boolean-valued expressions with guards (including
+    any future generalisations of guards), and it allows you to
+    make a choice based on any kind of pattern matching, not just
+    Boolean.
+
+    This is clumsier than 'cond', but over-using Boolean when some
+    more intention-revealing enumeration should be used is an
+    anti-pattern that has been recognised for over 20 years.  If
+    'cond' existed, there would be a strong pressure for people
+    to write functions that return a Boolean result when something
+    else might be more useful, just so they could use 'cond'.  
+    As an example, suppose that we want to continue if the voltage
+    is nominal, shut the device off if the voltage is low and there
+    is not an emergency, or set the speed slow if the voltage is
+    low and there is an emergency.
+
+    With cond:
+	cond voltage_nominal() -> continue_operations()
+	   ; in_emergency()    -> set_speed_slow()
+	   ; true              -> shut_device_down()
+	end
+
+    With case:
+	case      voltage() of nominal  -> continue_operations()
+	; or case status() of emergency -> set_speed_slow()
+                            ; normal    -> shut_device_down()
+	end
+
+    When expressed this way, I for one find it easier to realise
+    that "low" is not the opposite of "nominal"; a voltage that is
+    not nominal might be high.  So we really should have
+
+	case      voltage() of nominal   -> continue_operations()
+                             ; high      -> WHAT DO WE DO HERE?
+	; or case status()  of emergency -> set_speed_slow()
+			     ; normal    -> shut_device_down()
+	end
+
+    So an approach that gives you the "flat" structure of 'cond'
+    while subtly encouraging the multiway thinking of 'case' has
+    merit.  You could say that I am not so much for 'ouse' as
+    against 'cond' and over-use of Boolean.
+
+
+
+Rationale
+
+    I read one too many "why doesn't Erlang have an if" e-message,
+    and suddently remember "Algol 68 could do that with 'case'".
+
+    The main issue is how to spell 'ouse' in Erlang.  My first
+    preference was for 'or case', but that can't work.  I do not
+    love "; or case", and would be very happy to see something
+    better.  Indeed, "; case" might do the job, I just felt that
+    that was a bit too error-prone.
+
+
+
+Backwards Compatibility
+
+    All existing Erlang code remains acceptable with unchanged
+    semantics.  The implementation will be entirely in the parser,
+    so even tools that examine ASTs will be unaffected.
+
+
+
+Reference Implementation
+
+    None yet.  It will be entirely in the parser.
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

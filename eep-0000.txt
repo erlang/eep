@@ -48,6 +48,7 @@ Numerical Index
  S          23  Allow variables in fun M:F/A                   Richard A. O'Keefe
  SF/R12B-5  24  Functions may be named using F/N in all        Richard A. O'Keefe
                 module attributes
+ S          25  Unnesting cases                                Richard A. O'Keefe
 
 Key
 
