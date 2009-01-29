@@ -49,6 +49,7 @@ Numerical Index
  SF/R12B-5  24  Functions may be named using F/N in all        Richard A. O'Keefe
                 module attributes
  S          25  Unnesting cases                                Richard A. O'Keefe
+ S          26  Make andalso and orelse tail-recursive         Bjorn Gustavsson
 
 Key
 
