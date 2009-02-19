@@ -50,6 +50,7 @@ Numerical Index
                 module attributes
  S          25  Unnesting cases                                Richard A. O'Keefe
  S          26  Make andalso and orelse tail-recursive         Bjorn Gustavsson
+ S          27  Multi-Parameter Typechecking BIFs              James Hague
 
 Key
 
@@ -78,6 +79,7 @@ Owners
     Fredrik Svahn        <Fredrik (dot) Svahn (at) gmail>
     Patrik Nyblom
     Richard A. O'Keefe   <ok (at) cs (dot) otago (dot) ac (dot) nz>
+    James Hague          <james (dot) hague (at) gmail (dot) com>
 
 EEP editor(s) committee
 
