@@ -1,0 +1,255 @@
+EEP: 28
+Title: Optional leading semicolons for choices
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 08-Aug-2008
+Post-History:
+
+
+
+Abstract
+
+    If, case, receive, and try clauses may begin with a semicolon.
+
+
+
+Specification
+
+    A semicolon is allowed after the keywords 'if', 'of',
+    'receive' (provided the next word is not 'after'),
+    and 'catch' (in a 'try' expression).
+
+    The semicolon has no effect; it is merely there to allow
+    a layout style which makes it easier to see the semicolons,
+    easier to ensure that commas are commas and semicolons are
+    semicolons, and easier to change the order of choices.
+
+
+
+Motivation
+
+    In his PhD thesis on compiling Prolog, Peter van Roy complained
+    that commas and semicolons were hard to distinguish.  In response,
+    I developed a Prolog layout style where commas go at the end of
+    lines and semicolons go at the beginner, so that a human being
+    reading the text is never in doubt about which is intended.
+
+    Commas and semicolons remain hard to distinguish in Erlang.
+    It turns out that a semicolons-at-the-front style works well
+    for Erlang too.
+
+	do_load_driver(Path, Driver, DriverFlags) ->
+	    case erl_ddll:try_load(Path, Driver,
+			   [{monitor,pending_driver}]++DriverFlags) of
+		{error, inconsistent} ->
+		    {error,bad_driver_name};
+		{error, What} ->
+		    {error,What};
+		{ok, already_loaded} ->
+		    ok;
+		{ok,loaded} ->
+		    ok;
+		{ok, pending_driver, Ref} ->
+		    receive
+			{'DOWN', Ref, driver, _, load_cancelled} ->
+			    {error, load_cancelled};
+			{'UP', Ref, driver, _, permanent} ->
+			    {error, permanent};
+			{'DOWN', Ref, driver, _,
+			        {load_failure, Failure}} ->
+			    {error, Failure};
+			{'UP', Ref, driver, _, loaded} ->
+			    ok
+		    end
+	    end.
+
+    In this layout style, the visually most salient part is the
+    beginning of the line, and except for 'case', 'receive', and
+    'end', _every_ line could be _any_ line.  Indentation alone
+    is not a reliable guide, because some logical lines have to
+    be split across multiple physical lines.
+
+    My current style is
+
+	do_load_driver(Path, Driver, DriverFlags) ->
+	    case erl_ddll:try_load(Path, Driver,
+			   [{monitor,pending_driver}]++DriverFlags)
+	     of {error, inconsistent} ->
+		    {error,bad_driver_name}
+	      ; {error, What} ->
+		    {error,What}
+	      ; {ok, already_loaded} ->
+		    ok
+	      ; {ok,loaded} ->
+		    ok
+	      ; {ok, pending_driver, Ref} ->
+		    receive
+			{'DOWN', Ref, driver, _, load_cancelled} ->
+			    {error, load_cancelled}
+		      ;	{'UP', Ref, driver, _, permanent} ->
+			    {error, permanent}
+		      ; {'DOWN', Ref, driver, _,
+			        {load_failure, Failure}} ->
+			    {error, Failure}
+		      ;	{'UP', Ref, driver, _, loaded} ->
+			    ok
+		    end
+	    end.
+
+    Here the leading semicolons make it *obvious* with even half
+    an eye where each choice begins, and the line of semicolons
+    (lining up with the 'd' of 'end') makes it easy to see the
+    structure without a ruler.  There is only one snag:  the
+    first choice has to be different.  It would be more consistent
+    to write
+
+	do_load_driver(Path, Driver, DriverFlags) ->
+	    case erl_ddll:try_load(Path, Driver,
+			   [{monitor,pending_driver}]++DriverFlags) of
+	      ; {error, inconsistent} ->
+		    {error,bad_driver_name}
+	      ; {error, What} ->
+		    {error,What}
+	      ; {ok, already_loaded} ->
+		    ok
+	      ; {ok,loaded} ->
+		    ok
+	      ; {ok, pending_driver, Ref} ->
+		    receive
+		      ; {'DOWN', Ref, driver, _, load_cancelled} ->
+			    {error, load_cancelled}
+		      ;	{'UP', Ref, driver, _, permanent} ->
+			    {error, permanent}
+		      ; {'DOWN', Ref, driver, _,
+			        {load_failure, Failure}} ->
+			    {error, Failure}
+		      ;	{'UP', Ref, driver, _, loaded} ->
+			    ok
+		    end
+	    end.
+
+    Now each choice has the same structure, and if we wished to
+    reorder the choices, we could easily do so without adding,
+    removing, or changing any punctuation.
+
+    It is relevant to see what case statements look like in some other
+    programming languages, to see that this style is quite general.
+
+    Fortran:
+	SELECT CASE (expression)
+	CASE (values and ranges)
+	    statements
+	CASE (values and ranges)
+	    statements
+	CASE DEFAULT
+	    statements
+	END CASE
+
+    Ada:
+	case Expression is
+	when Discrete_Choice_List =>
+	    Statements;
+	when Discrete_Choice_List =>
+	    Statements;
+	when others =>
+	    Statements;
+	end case;
+
+    PL/I:
+	select (Expression);
+	  when (Values) Statement;
+	  when (Values) Statement;
+	  otherwise     Statement;
+	end;
+
+    These all exhibit "comb style", the ability to rearrange choices
+    without adding, removing, or changing punctuation or keywords,
+    and a clear indication at the _beginning_ of each choice.
+
+
+
+Rationale
+
+    People who like the usual Erlang style should not be forced to
+    change.  This means that the leading semicolon must be optional,
+    not required.
+
+    Some of the benefits claimed above could be had by allowing
+    optional trailing semicolons instead of optional leading ones.
+    However, in Erlang as it stands, the semicolon is an operator,
+    not a terminator.  There is nothing unusual about allowing an
+    operator to have a prefix version as well as an infix version.
+    There isn't even anything unusual about a prefix operator that
+    doesn't do much except clarify things: '+' is the obvious
+    example.  So allowing a "do-nothing" prefix use of semicolons
+    in certain contexts is still within the spirit of Erlang.
+
+    That apart, the change is about as simple as it could be.
+    The only doubtful point is whether a semicolon should be
+    allowed before 'after'.  But 'after' is already a keyword
+    explaining what comes next, and it can't be moved around
+    freely anyway.  Since there seems to be nothing to gain,
+    let's not do it.
+
+
+
+Backwards Compatibility
+
+    All existing Erlang code remains acceptable with unchanged
+    semantics.  The leading semicolons are dealt with entirely in
+    the parser; other language manipulation tools never know that
+    the semicolons were ever there, so work perfectly with code
+    using the new style.
+
+
+
+Reference Implementation
+
+    The auxiliary file eep-0028-1.diff
+    is a patch file to be applied to erl_parse.yrl.
+    The patched file has been checked by yecc, which is happy
+    with it, and the resulting .erl file compiles cleanly.
+    However, that's all the testing that has been done.
+
+    All that the implementation does is to change
+	.... 'thingy' .....
+    to
+	.... thingy_kw .....
+
+	thingy_kw -> 'thingy'.
+	thingy_kw -> 'thingy' ';'.
+
+    in several places.  This form of change, rather than
+
+        .... 'thingy' optional_semicolon ....,
+
+    was chosen so that the '$n' forms in the existing rules would
+    need no revision, so I am confident that no errors were
+    introduced by this change.
+
+
+
+References
+    
+    None.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

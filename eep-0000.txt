@@ -51,6 +51,7 @@ Numerical Index
  S          25  Unnesting cases                                Richard A. O'Keefe
  SA/R13A    26  Make andalso and orelse tail-recursive         Bjorn Gustavsson
  S          27  Multi-Parameter Typechecking BIFs              James Hague
+ S          28  Optional leading semicolons for choices        Richard A. O'Keefe
 
 Key
 

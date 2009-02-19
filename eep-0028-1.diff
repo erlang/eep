@@ -1,0 +1,169 @@
+*** parse1.yrl	Thu Jul 10 13:50:11 2008
+--- parse1s.yrl	Fri Aug  8 10:18:30 2008
+***************
+*** 32,41 ****
+  tuple
+  %struct
+  record_expr record_tuple record_field record_fields
+! if_expr if_clause if_clauses case_expr cr_clause cr_clauses receive_expr
+  fun_expr fun_clause fun_clauses
+! %% cond_expr cond_clause cond_clauses
+! try_expr try_catch try_clause try_clauses query_expr
+  function_call argument_list
+  exprs guard
+  atomic strings
+--- 32,44 ----
+  tuple
+  %struct
+  record_expr record_tuple record_field record_fields
+! if_expr if_kw if_clause if_clauses
+! case_expr of_kw cr_clause cr_clauses
+! receive_expr receive_kw
+  fun_expr fun_clause fun_clauses
+! %% cond_expr cond_kw cond_clause cond_clauses
+! try_expr try_catch catch_kw try_clause try_clauses
+! query_expr
+  function_call argument_list
+  exprs guard
+  atomic strings
+***************
+*** 274,281 ****
+  	{call,line('$1'),'$1',element(1, '$2')}.
+  
+  
+! if_expr -> 'if' if_clauses 'end' : {'if',line('$1'),'$2'}.
+  
+  if_clauses -> if_clause : ['$1'].
+  if_clauses -> if_clause ';' if_clauses : ['$1' | '$3'].
+  
+--- 277,287 ----
+  	{call,line('$1'),'$1',element(1, '$2')}.
+  
+  
+! if_expr -> if_kw if_clauses 'end' : {'if',line('$1'),'$2'}.
+  
++ if_kw -> 'if'.
++ if_kw -> 'if' ';'.
++ 
+  if_clauses -> if_clause : ['$1'].
+  if_clauses -> if_clause ';' if_clauses : ['$1' | '$3'].
+  
+***************
+*** 283,291 ****
+  	{clause,line(hd(hd('$1'))),[],'$1','$2'}.
+  
+  
+! case_expr -> 'case' expr 'of' cr_clauses 'end' :
+  	{'case',line('$1'),'$2','$4'}.
+  
+  cr_clauses -> cr_clause : ['$1'].
+  cr_clauses -> cr_clause ';' cr_clauses : ['$1' | '$3'].
+  
+--- 289,300 ----
+  	{clause,line(hd(hd('$1'))),[],'$1','$2'}.
+  
+  
+! case_expr -> 'case' expr of_kw cr_clauses 'end' :
+  	{'case',line('$1'),'$2','$4'}.
+  
++ of_kw -> 'of'.
++ of_kw -> 'of' ';'.
++ 
+  cr_clauses -> cr_clause : ['$1'].
+  cr_clauses -> cr_clause ';' cr_clauses : ['$1' | '$3'].
+  
+***************
+*** 292,304 ****
+  cr_clause -> expr clause_guard clause_body :
+  	{clause,line('$1'),['$1'],'$2','$3'}.
+  
+! receive_expr -> 'receive' cr_clauses 'end' :
+  	{'receive',line('$1'),'$2'}.
+  receive_expr -> 'receive' 'after' expr clause_body 'end' :
+  	{'receive',line('$1'),[],'$3','$4'}.
+! receive_expr -> 'receive' cr_clauses 'after' expr clause_body 'end' :
+  	{'receive',line('$1'),'$2','$4','$5'}.
+  
+  
+  fun_expr -> 'fun' atom '/' integer :
+  	{'fun',line('$1'),{function,element(3, '$2'),element(3, '$4')}}.
+--- 301,315 ----
+  cr_clause -> expr clause_guard clause_body :
+  	{clause,line('$1'),['$1'],'$2','$3'}.
+  
+! receive_expr -> receive_kw cr_clauses 'end' :
+  	{'receive',line('$1'),'$2'}.
+  receive_expr -> 'receive' 'after' expr clause_body 'end' :
+  	{'receive',line('$1'),[],'$3','$4'}.
+! receive_expr -> receive_kw cr_clauses 'after' expr clause_body 'end' :
+  	{'receive',line('$1'),'$2','$4','$5'}.
+  
++ receive_kw -> 'receive'.
++ receive_kw -> 'receive' ';'.
+  
+  fun_expr -> 'fun' atom '/' integer :
+  	{'fun',line('$1'),{function,element(3, '$2'),element(3, '$4')}}.
+***************
+*** 314,331 ****
+  	{Args,Pos} = '$1',
+  	{clause,Pos,'fun',Args,'$2','$3'}.
+  
+! try_expr -> 'try' exprs 'of' cr_clauses try_catch :
+  	build_try(line('$1'),'$2','$4','$5').
+  try_expr -> 'try' exprs try_catch :
+  	build_try(line('$1'),'$2',[],'$3').
+  
+! try_catch -> 'catch' try_clauses 'end' :
+  	{'$2',[]}.
+! try_catch -> 'catch' try_clauses 'after' exprs 'end' :
+  	{'$2','$4'}.
+  try_catch -> 'after' exprs 'end' :
+  	{[],'$2'}.
+  
+  try_clauses -> try_clause : ['$1'].
+  try_clauses -> try_clause ';' try_clauses : ['$1' | '$3'].
+  
+--- 325,345 ----
+  	{Args,Pos} = '$1',
+  	{clause,Pos,'fun',Args,'$2','$3'}.
+  
+! try_expr -> 'try' exprs of_kw cr_clauses try_catch :
+  	build_try(line('$1'),'$2','$4','$5').
+  try_expr -> 'try' exprs try_catch :
+  	build_try(line('$1'),'$2',[],'$3').
+  
+! try_catch -> catch_kw try_clauses 'end' :
+  	{'$2',[]}.
+! try_catch -> catch_kw try_clauses 'after' exprs 'end' :
+  	{'$2','$4'}.
+  try_catch -> 'after' exprs 'end' :
+  	{[],'$2'}.
+  
++ catch_kw -> 'catch'.
++ catch_kw -> 'catch' ';'.
++ 
+  try_clauses -> try_clause : ['$1'].
+  try_clauses -> try_clause ';' try_clauses : ['$1' | '$3'].
+  
+***************
+*** 339,346 ****
+  	L = line('$1'),
+  	{clause,L,[{tuple,L,['$1','$3',{var,L,'_'}]}],'$4','$5'}.
+  
+! %%cond_expr -> 'cond' cond_clauses 'end' : {'cond',line('$1'),'$2'}.
+  
+  %%cond_clauses -> cond_clause : ['$1'].
+  %%cond_clauses -> cond_clause ';' cond_clauses : ['$1' | '$3'].
+  
+--- 353,363 ----
+  	L = line('$1'),
+  	{clause,L,[{tuple,L,['$1','$3',{var,L,'_'}]}],'$4','$5'}.
+  
+! %%cond_expr -> cond_kw cond_clauses 'end' : {'cond',line('$1'),'$2'}.
+  
++ %%cond_kw -> 'cond'.
++ %%cond_kw -> 'cond' ';'.
++ 
+  %%cond_clauses -> cond_clause : ['$1'].
+  %%cond_clauses -> cond_clause ';' cond_clauses : ['$1' | '$3'].
+  
