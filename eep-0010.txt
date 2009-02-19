@@ -439,18 +439,16 @@ Suggested solution
 ...................
 
 To make a solution that as far as possible does not break current code
-and also keeps (or reverts to) the original intention of the
-io-system protocol, I suggest a scheme where the formatting functions
-that return lists, keep to the current behavior except when the
-translation-modifier is used, in which case binaries in UTF-8 encoding
-are returned.
+and also keeps (or reverts to) the original intention of the io-system
+protocol, I suggest a scheme where the formatting functions that
+return lists, keep to the current behavior as far as possible.
 
-So the io_lib:format function returns a (possibly deep)
-list of integers (latin1, which can be viewed as a subset of Unicode)
+So the io_lib:format function returns a (possibly deep) list of
+integers 0..255 (latin1, which can be viewed as a subset of Unicode)
 if used without translation modifiers. If the translation modifiers
-are used, it will however return a mixed list as those handled by my
-suggested conversion routines. Going back to the Bulgarian string
-(ex1_), let's look at the following::
+are used, it will however return a possibly deep list of integers in
+the complete unicode range. Going back to the Bulgarian string (ex1_),
+let's look at the following::
 
     1> UniString = [1050,1072,1082,1074,
                 1086,32,1077,32,85,110,105,99,111,100,101,32,63].
@@ -462,20 +460,26 @@ the other hand::
 
     3> io_lib:format("~ts",[UniString]).
 
-\- would return a (deep) list with the Unicode string as a binary::
+\- would return a (deep) list with the Unicode string as a list of integers::
 
-    [[<<208,154,208,176,208,186,208,178,208,190,32,208,181,32,
-        85,110,105,99,111,100,101,32,63>>]]   
+    [[1050,1072,1082,1074,1086,32,1077,32,85,110,105,99,111,100,
+      101,32,63]]   
 
 
-The downside of introducing binaries is of course that::
+The downside of introducing integers > 255 in the result list is of course
+that the return value of the function is no longer valid iodata(), but on
+the other hand, the following code::
 
     lists:flatten(io_lib:format("~ts",[UniString]))
 
-no longer behaves as expected, but as the format modifier "t" is new, this 
-would not break old code. To get a Unicode string one should instead use::
+will give a result similar to that of a non-Unicode version. 
 
-    unicode:characters_to_list(io_lib:format("~ts",[UniString]),unicode)
+As the format modifier "t" is new, the possibility to get integers >
+255 in the resulting deep list will not break old code. To get
+iodata() in UTF-8, one could simply do::
+
+    unicode:characters_to_binary(io_lib:format("~ts",[UniString]),
+                                 unicode, unicode)
 
 As before, directly formatting (with ~s) a list of characters > 255
 would be an error, but with the "t" modifier it would work.
@@ -661,7 +665,7 @@ the io-module. Let's once again assume UTF-16 on the file.
 
 - io:get_chars and io:get_line will work on the Unicode data provided
   by the io-protocol. All Unicode returns will be as Unicode lists as
-  expected. The fread function will return UTF-8 encoded binaries only
+  expected. The fread function will return lists with integers > 255 only
   when the translation modifier is supplied.
 
 Example 6 - raw reading
@@ -741,7 +745,7 @@ formatting function, which expects mixed lists of integers
 0..16#10ffff and binaries with UTF-8 coded Unicode characters. The
 functions in  io and io_lib will retain their current
 functionality for code not using the translation modifier, but will
-return UTF-8 binaries when ordered to.  
+return Unicode characters when ordered to.  
 
 The fread function should in the same way accept Unicode data only
 when the "t" modifier is used.
