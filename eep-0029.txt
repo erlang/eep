@@ -1,0 +1,768 @@
+EEP: 29
+Title: Abstract Patterns, Stage 1
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok (at) cs (dot) otago (dot) ac (dot) nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-5
+Content-Type: text/plain
+Created: 25-Feb-2009
+
+Post-History:
+
+
+
+Abstract
+
+    Abstract Patterns are named pattern/guard combinations
+    which can be used
+    - in patterns, to support abstract data types
+    - as user-defined guards, guaranteed safe-for-guards
+    - as ordinary functions
+    - to replace many but not all uses of macros.
+    The full proposal has six stages, of which this is stage 1.
+    This stage allows only simple abstract patterns which can be
+    handled by in-line substitution, so requiring no change to the
+    Erlang Virtual Machine.
+
+
+
+Specification
+
+    We introduce abstract pattern declarations and calls.
+    The syntax is given as an adaptation of that in parse.yrl.
+
+    form -> abstract_pattern dot.
+
+    abstract_pattern -> '#' atom clause_args clause_guard
+                        '->' expr.
+    
+    For future reference, we'll use the schematic rule
+	#A(H1, ..., Hn) when G -> B.
+    where an empty clause_guard is taken to mean that G is 'true'.
+    H1, ..., Hn and B must all be patterns.
+
+    Abstract patterns may not be directly or indirectly recursive.
+
+    expr_700 -> pattern_call.
+
+    pattern_call -> '#' atom argument_list
+
+    The expressions in the argument_list of a pattern_call must be
+    - patterns in a pattern
+    - guard expressions elsewhere in a guard
+    - any expression elsewhere in an ordinary expression.
+
+    There are two ways to understand the semantics of abstract
+    patterns: as function calls and as inline substitution.
+
+    Considered as functions, stage 1 abstract patterns correspond
+    to two functions.  Given our schematic rule, we get
+
+	'#A->'(H1, ..., Hn) when G -> B.
+
+    That is, part of the meaning of an abstract pattern is a
+    function that works just the way it looks as if it works.
+    (The name '#A->' is for expository purposes and should not
+    be taken literally.  In particular, it is NOT part of this
+    specification that such a function should be directly
+    accessible at all, still less that it should be accessible
+    by a name of that form.)  So
+
+	#permute([R,A,T]) when is_atom(A) -> [T,A,R].
+
+    acts in one direction just like
+
+	'#permute->'([R,A,T]) when is_atom(A) -> [T,A,R].
+
+    would.  Because abstract patterns are not allowed to be
+    recursive and cannot have any side effects, it is safe
+    to call them in guards.  As a guard test, #A(E1,...,En)
+    is equivalent to (true = '#A->'(E1,...,En)).	
+
+    In the other direction, we get
+
+	'#A='(B) when G -> {H1, ..., Hn}.
+
+    A pattern match
+
+	#A(P1, ..., Pn) = E
+
+    is equivalent to
+
+	{P1, ..., Pn} = '#A='(E)
+
+    When some of the patterns Hi, B use '=', the definition is
+    a little trickier.  Suppose, for example, we have
+	#foo([H|T] = X) -> {H,T}.
+    A naive translation would be
+	'#foo='({H,T}) -> [H|T] = X.
+    which would not work, because X would be undefined.  The
+    basic problem here is that '=' in patterns is symmetric,
+    while '=' in expressions is not.  The real translation
+    has to be that
+	#A(H11=H12=.., ..., Hn1=Hn2=..) when G -> B
+    is equivalent to
+	'#A='(B)
+	when G, X1=H11, X1=H12, ..., Xn=Hn1, Xn=Hn2, ...
+	-> {X1, ..., Xn}
+    where the bindings Xi=Hij are both sorted and re-ordered
+    (that is, switched from Xi=Hij to Hij=Xi) according to
+    data flow.  In the case of the #foo/1 example, we'd get
+	'#foo='({H,T}) when X1 = [H|T], X = X1 -> {X1}.
+    The sorting and reordering process is easier than it sounds.
+    While there is an equation Xi=Hij such that either every
+    variable in Hij is known or Xi is known, add Xi=Hij if
+    Hij is all known, or Hij = Xi if Xi is known.
+
+    This sorting-and-reordering-by-dataflow is also recommended
+    in the forward direction when B contains '='.
+
+    Sometimes one or the other direction of an abstract pattern
+    cannot be constructed, even with sorting and reordering by
+    dataflow.  This is typically because one side contains a
+    variable that doesn't occur on the other.  For example,
+
+	#first(X) -> {X,_}.
+	#second(Y) -> {_,Y}.
+
+    are usable as patterns, but not as functions.  The compiler
+    should issue a warning for such abstract patterns but allow
+    them.  It should be a run-time error to call such a pattern
+    as a function as well.  It should be possible to suppress
+    the warning, perhaps by
+
+	-compile({pattern_only,[{first,1,second,1}]}).
+
+    (That's within the current syntax.  Ideally that should be
+     #first/1 and #second/1.)
+
+    For another example,
+
+	#is_date(#date(_,_,_)) -> true.
+
+    is usable as a function, even/especially in a guard, but is    
+    not usable as a pattern.  The compiler should issue a
+    warning for such abstract patterns but allow them.  It
+    should be a run-time error to call such a pattern as well.
+    It should be possible to suppress the warning, perhaps by
+
+	-compile({function_only,[{is_date,1}]}).
+
+    Definition via in-line substituion is straightforward.
+    All of the following rewrites assume a standard renaming
+    of variables.
+
+        f(... #A(P1,...,Pn) ...) when Gf -> Bf
+
+    rewrites to
+
+	f(... B ...)
+	when G, Xi=Hij..., {P1,...,Pn} = {X1,...,Xn}, Gf -> Bf
+
+	case ... of ... #(P1,...,Pn) ... when Gc -> Bc
+    
+    rewrites to
+
+	case ... of ... B ...
+	when G, Xi=Hij..., {P1,...,Pn} = {X1,...,Xn}, Gc -> Bc
+
+	P = E
+
+    rewrites to
+
+	case E of P -> ok end
+
+    In a guard expression,
+
+	(... #A(E1, ..., En) ...)
+
+    rewrites to
+
+	{H1,...,Hn} = {E1,...,En}, G, (... B ...)
+
+    As a guard test,
+
+	#A(E1, ..., En)
+
+    rewrites to
+
+	{H1,...,Hn} = {E1,...,En}, G, true = B
+
+    As an ordinary expression,
+
+	#A(E1, ..., En)
+
+    rewrites to
+
+	case {E1,...,En} of {H1,...,Hn} when G -> B end
+
+
+
+Motivation
+
+    Even in this restricted form, abstract patterns solve a lot
+    of problems that keep coming up on the Erlang mailing list.
+    They were invented to serve two main purposes:  to greatly
+    reduce the need for the preprocessor, and to support the
+    use of abstract data types.  It turns out that they can also
+    reduce the amount of keyboard work a programmer has to do,
+    and increase the amount of type information available to the
+    compiler.
+
+    Macros are often used to provide named constants.
+    For example,
+
+	-define(unknown, "UNKNOWN").
+	f(?unknown, Actors) -> Actors;
+	f(N, Actors) -> lists:keydelete(N, #actor.name, Actors).
+
+    A function is not used here because function calls may not
+    appear in patterns.  Abstract patterns are functions that
+    are sufficiently restricted that they _may_ appear in patterns:
+
+	#unknown() -> "UNKNOWN".
+	f(#unknown(), Actors) -> Actors;
+	f(N, Actors) -> lists:keydelete(n, #actor.name, Actors).
+
+    Sometimes these constants must be computed.
+    For example,
+
+	-define(START_TIMEOUT, 1000 * 30).
+
+    Thanks to variable binding in guards, we can do that too:
+
+	#start_timeout() when N = 1000*30 -> N.
+
+    There are things that macros cannot do, because there needs
+    to be a guard test as well as a pattern.  Macros can't bilocate.
+
+	#date(D, M, Y)
+	when is_integer(Y), Y >= 1600, Y =< 2500,
+	     is_integer(M), M >= 1,    M =< 12,
+	     is_integer(D), D >= 1,    D =< 31
+	-> {Y, M, D}.
+
+	#vector3(X, Y, Z)
+	when is_float(X), is_float(Y), is_float(Z)
+	-> {X, Y, Z}.
+
+	#mod_func(M, F) when is_atom(M), is_atom(F) -> {M, F}.
+
+	#mod_func_arity(M, F, A)
+	when is_atom(M), is_atom(F), is_integer(A), A >= 0
+	-> {M, F, A}.
+
+    Some macros cannot be replaced by abstract patterns.
+
+	-define(DBG(DbgLvl, Format, Data),
+		dbg(DbgLvl, Format, Data)).
+
+    cannot be an abstract pattern because the right hand side
+    involves a call to an ordinary function.
+
+    Some macros define guard tests.  For example,
+
+	-define(tab, 9).
+	-define(space, 32).
+	-define(is_tab(X), X == ?tab).
+	-define(is_space(X), X == ?space).
+	-define(is_underline(X), X == $_).
+	-define(is_number(X), X >= $0, X =< $9).
+	-define(is_upper(X), X >= $A, X =< $Z).
+	-define(is_lower(X), X >= $a, X =< $z).
+
+	token([X|File], L, Result, Gen, BsNl)
+	  when ?is_upper(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([X|File], L, Result, Gen, BsNl)
+	  when ?is_lower(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([X|File], L, Result, Gen, BsNl)
+	  when ?is_underline(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+
+    These can be converted to abstract patterns that are usable
+    as guard tests,
+
+	#tab() -> 9.
+	#space() -> 32.
+	#is_tab(#tab()) -> true.
+	#is_space(#space()) -> true.
+	#is_underline($_)) -> true.
+	#is_number(X) when X >= $0, X =< $9 -> true.
+	#is_upper(X)  when X >= $A, X =< $Z -> true.
+	#is_lower(X)  when X >= $a, X =< $z -> true.
+
+	token([X|File], L, Result, Gen, BsNl)
+	  when #is_upper(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([X|File], L, Result, Gen, BsNl)
+	  when #is_lower(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([X|File], L, Result, Gen, BsNl)
+	  when #is_underline(X) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+
+    or to abstract patterns that can be used as patterns,
+
+	#tab() -> 9.
+	#space() -> 32.
+	#underline(X) when X == $_ -> X.
+	#number(X) when X >= $0, X =< $9 -> X.
+	#upper(X)  when X >= $A, X =< $Z -> X.
+	#lower(X)  when X >= $a, X =< $z -> X.
+	
+	token([#upper(X)|File], L, Result, Gen, BsNl) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([#lower(X)|File], L, Result, Gen, BsNl) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+	token([#underline(X)|File], L, Result, Gen, BsNl) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+
+    Of course we can use disjunction in the guard of an
+    abstract pattern.
+
+	#id_start(X) when X >= $A, X =< $Z
+			; X >= $a, X =< $z
+			; X == $_           -> X.
+
+	token([#is_start(X)|File], L, Result, Gen, BsNl) ->
+	    GenNew = case Gen of not_set -> var; _ -> Gen end,
+	    {Rem, Var} = tok_var(File, [X]),
+	    token(Rem, L, [{var,Var}|Result], GenNew, BsNl);
+
+    Yes, the original macro-based version could have done the same.
+    It's from the OTP sources; don't blame me.
+
+    Aside from replacing a pattern AND a guard, which macros cannot
+    do, the great advantages over patterns over macros are that
+    - they can be syntax-checked at the point of definition,
+      while macros can only be syntax-checked at the point of use;
+    - there is no problem, indeed no possibility, of variable name
+      capture;
+    - abstract patterns are value based, not token-list based, so
+      there are no problems with operators.
+
+    Consider the following OTP macro:
+
+	-define(IC_FLAG_TEST(_F1, _I1), ((_F1 band _I1) == _I1)).
+
+    First, the author was evidently scared of accidental collisions
+    with other variable names.  Second, the parentheses look as
+    though they are there in case of operator precedence bugs.
+      There's at least one other like it,
+
+	-define(is_set(F, Bits), ((F) band (Bits)) == (F)).
+
+    which (correctly) suggests that the first macro doesn't have enough
+    parentheses.    The abstract pattern equivalent,
+
+	#ic_flag_test(Flags, Mask) when Flags band Mask == Mask -> true.
+
+    has neither problem.
+
+    Once again, there are things that abstract patterns cannot do.
+    For example,
+
+	-define(get_max(_X, _Y), if _X > _Y -> _X; true -> _Y end).
+	-define(get_min(_X, _Y), if _X > _Y -> _Y; true -> _X end).
+
+    These cannot be abstract patterns because an abstract pattern
+    cannot contain an 'if' or a 'case' or any other control structure.
+    But they can, and should, be ordinary inline functions:
+
+	-compile({inline,[{max,2},{min,2}]}).
+	max(X, Y) -> if X > Y -> X; true -> Y end.
+	min(X, Y) -> if X > Y -> Y; true -> X end.
+
+    Abstract patterns don't need to do what ordinary functions can.
+    Here's another example from the OTP sources.
+
+	-define(LOWER(Char),
+		if
+		    Char >= $A, Char =< $Z ->
+			Char - ($A - $a);
+		    true ->
+			Char
+		end).
+	tolower(Chars) ->
+	    [?LOWER(Char) || Char <- Chars].
+
+    This could, and should, have been an ordinary inlined function.
+    Abstract patterns don't need to do what ordinary functions can.
+    Let's examine it a little closer.  Suppose we had a pattern
+	Cl = #lower(Cx)
+    which when used as an ordinary function converted both $x and $X
+    to $x.  Then when used as a pattern #lower(Cx) = $x, there would
+    be two correct answers for Cx.  There are no other cases where
+    a pattern may match more than one way.  The fact that abstract
+    patterns cannot do conditionals is one of the things that makes
+    them usable as patterns.
+
+    Macros are sometimes used for module names.
+
+	-define(SERVER,{rmod_random_impl,
+                list_to_atom("babbis@" ++
+		hd(tl(string:tokens(atom_to_list(node()),"@"))))}).
+
+	-define(CLIENTMOD,'rmod_random').
+
+	produce() -> ?CLIENTMOD:produce(?SERVER).
+
+    Abstract patterns can be used for this too, but there is an
+    error waiting to happen.
+
+	server() -> {rmod_random_impl,
+                list_to_atom("babbis@" ++
+		hd(tl(string:tokens(atom_to_list(node()),"@"))))}.
+
+	#client_mod() -> 'rmod_random'.
+	
+	produce -> #client_mod():produce(server()).
+
+    The risk is that of writing #client_mod:produce(server()),
+    which is the syntax we'll want in stage 2 for calling an
+    abstract pattern defined in another module.
+    There is one thing that macros are used for that abstract
+    patterns can be used for, but you'd probably rather not.
+    
+    Abstract patterns were also invented with the aim of
+    replacing at least some uses of records.  Frames (or Joe
+    Armstrong's structs, which are essentially the same thing)
+    are a superior way to do that.   Let's see a simple case.
+
+	-record(mark_params, {cell_id,
+			      virtual_col,
+			      virtual_row
+			     }).
+	...
+	MarkP = mark_params(),
+	...
+	NewMarkP = MarkP#mark_params{cell_id     = undefined,
+				     virtual_col = undefined,
+				     virtual_row = VirtualRow
+				    },
+
+    This becomes
+
+	% General
+	#mark_params(Cell, Row, Col) -> {mark_params, Cell, Row, Col}.
+	% Initial value
+	#mark_params() -> #mark_params(undefined, undefined, undefined).
+	% Recogniser
+	#is_mark_params({mark_params,_,_,_}) -> true.
+	% Cell extractor
+	#mark_params__cell(#mark_params(Cell,_,_)) -> Cell.
+	% Cell updater
+	#mark_params__cell(Cell, #mark_params(_,R,C)) ->
+	    #mark_params(Cell, R, C).
+	% Row extractor
+	#mark_params__row(#mark_params(_,Row,_)) -> Row.
+	% Row updater
+	#mark_params__row(Row, #mark_params(K,_,C)) ->
+	    #mark_params(K, Row, C).
+	% Col extractor
+	#mark_params__col(#mark_params(_,_,Col)) -> Col.
+	% Col updater
+	#mark_params__col(Col, #mark_params(K,R,_)) ->
+	    #mark_params(K, R, Col).
+	...
+	MarkP = #mark_params(),
+	...
+        NewMarkP = #mark_params__row(VirtualRow,
+                   #mark_params__col(undefined,
+                   #mark_params__cell(undefined, MarkP)))
+
+    The extractor and updater patterns can be derived automatically,
+    which comes in stage 4.  With frames/structs, we may never bother.
+
+    There is a feature of Haskell that I have long loved.
+    That is so-called "n+k patterns", where a pattern may be N+K
+    for N a variable and K a positive integer.  This matches V
+    if V is an integer greater than or equal to K, and binds N
+    to V - K.  For example,
+
+	fib 0 = 1
+	fib 1 = 1
+	fib (n+2) = fib n + fib (n+1)
+    
+    Not that that's a good way to implement the Fibonacci function,
+    of course.  (It takes O(phi^N) when O(log N) is attainable.)
+    There's no such thing in Erlang.  But with abstract patterns,
+    we could program it:
+
+	#succ(M) when is_integer(N), N >= 1, M = N - 1 -> N.
+
+	fib(0) -> 1;
+	fib(1) -> 1;
+	fib(#succ(#succ(N)) -> fib(N) + fib(N+1).
+
+    Sometimes we want a three-way split:
+	N = 1
+	N = 2k+0 (k >= 1)
+	N = 2k+1 (k >= 1)
+    We can program that too:
+	#one() -> 1.
+	#even(K)
+	when is_integer(N), (N band 1) == 0, N >= 2, K = N div 2
+	-> N.
+	#odd(K)
+	when is_integer(N), (N band 1) == 1, N >= 3, K = N div 2
+	-> N.
+
+	ruler(#one())   -> 0 ;
+	ruler(#even(K)) -> 1 + ruler(K);
+	ruler(#odd(K))  -> 1.
+
+    Let's turn to abstract data types.
+    There are three obvious ways to implement association lists
+    as single data structures:
+
+	[{K1,V1}, ..., {Kn,Vn}]		% pairs
+	[K1,V1, ..., Kn,Vn]		% alternating
+	{K1,V1, ..., {Kn,Vn,[]}}	% triples
+
+    Suppose you cannot make up your mind which is better.
+
+	#empty_alist() -> [].
+	-ifdef(PAIRS).
+	#non_empty_alist(K,V,R) -> [{K,V}|R].
+	-else.
+	-ifdef(TRIPLES).
+	#non_empty_alist(K,V,R) -> {K,V,R}.
+	-else.
+	#non_empty_alist(K,V,R) -> [K,V|R].
+	-endif.
+	-endif.
+
+	zip([K|Ks], [V|Vs]) ->
+	    #non_empty_alist(K, V, zip(Ks, Vs));
+	zip([], []) ->
+	    #empty_alist().
+
+	lookup(K, #non_empty_alist(K,V,_), _) ->
+	    V;
+	lookup(K, #non_empty_alist(_,_,R), D) ->
+	    lookup(K, R, D);
+	lookup(K, #empty_alist(), D) ->
+	    D.
+
+    Now you can switch between the three implementations, for	
+    testing and benchmarking, by flicking a single preprocessor
+    switch.  
+
+    Sometimes there is something that would have been an algebraic
+    data type in Haskell or Clean or SML or CAML, but in Erlang we
+    just have to use a variety of tuples.  The parsed form of
+    Erlang source code is a good example.
+
+	lform({attribute,Line,Name,Arg}, Hook) ->
+	    lattribute({attribute,Line,Name,Arg}, Hook);
+	lform({function,Line,Name,Arity,Clauses}, Hook) ->
+	    lfunction({function,Line,Name,Arity,Clauses}, Hook);
+	lform({rule,Line,Name,Arity,Clauses}, Hook) ->
+	    lrule({rule,Line,Name,Arity,Clauses}, Hook);
+	%% These are specials to make it easier for the compiler.
+	lform({error,E}, _Hook) ->
+	    leaf(format("~p\n", [{error,E}]));
+	lform({warning,W}, _Hook) ->
+	    leaf(format("~p\n", [{warning,W}]));
+	lform({eof,_Line}, _Hook) ->
+	    $\n.
+
+    We can define abstract patterns for these.
+
+	#attribute(L, N, A)    -> {attribute, L, N, A}.
+	#function( L, N, A, C) -> {function,  L, N, A, C}.
+	#rule(     L, N, A, C) -> {rule,      L, N, A, C}.
+	#eof(      L)          -> {eof,       L}.
+	#error(    E_          -> {error,     E}.
+	#warning(  W)          -> {warning,   W}.
+
+	#attribute()		-> #attribute(_,_,_).
+	#function()		-> #function(_,_,_,_).
+	#rule()			-> #rule(_,_,_,_).
+
+	lform(Form, Hook) ->
+	    case Form
+	      of #attribute() -> lattribute(Form, Hook)
+	       ; #function()  -> lfunction( Form, Hook)
+	       ; #rule()      -> lrule(     Form, Hook)
+	       ; #error(E)    -> leaf(format("~p\n", [{error,E}]))
+	       ; #warning(W)  -> leaf(format("~p\n", [{warning,W}]))
+	       ; #eof(_)      -> $\n
+	    end.
+
+    It would almost be worth defining these patterns even if these
+    were their only occurrences, simply for the clarity they permit.
+    But these patterns would be used over and over again.  Using
+    the patterns not only makes the code shorter and clearer, it
+    gives us two kinds of protection against changes to the data
+    representation.  For example, suppose we decided to hold
+    Name/Arity information in 'function' and 'rule' tuples as
+    pairs, not as separate fields.  Then we could do
+
+    	-ifdef(OLD_DATA).
+	#function( L, N, A,  C) -> {function,  L, N, A, C}.
+	#rule(     L, N, A,  C) -> {rule,      L, N, A, C}.
+	#function( L, {N,A}, C) -> {function,  L, N, A, C}.
+	#rule(     L, {N,A}, C) -> {rule,      L, N, A, C}.
+	-else.
+	#function( L, N, A, C)  -> {function,  L, {N,A}, C}.
+	#rule(     L, N, A, C)  -> {rule,      L, {N,A}, C}.
+	#function( L, NA,   C)  -> {function,  L, NA,    C}.
+	#rule(     L, NA,   C)  -> {rule,      L, NA,    C}.
+        -endif.
+
+    The rest of the code would remain unchanged.  That's one kind of
+    protection.  It doesn't help us when we need to add new cases.
+    That's when the second kind of protection comes up.  Looking
+    for '#function' is a much safer guide to finding relevant places
+    than looking for 'function'.
+
+
+
+Rationale
+
+    There is more to the idea of abstract patterns than this
+    specification describes.  Here's a "road map".
+
+    Stage 0:	Allow pattern matching in guards.
+		This is the subject of another EEP, as it is
+		desirable in itself.  This MUST be implemented
+		first before implementing Stage 1, because that's
+		what we want inlinable pattern calls to expand to.
+
+    Stage 1:	Simple abstract patterns restricted so that they
+		can be implemented exclusively by inline expansion.
+		This requires no change to the VM other than the
+		changes required for Stage 0.
+
+		Import/export of patterns can be faked using the
+		preprocessor to -include definitions; this is not
+		ideal, but it's an acceptable stopgap.
+
+    Stage 2:	Abstract functions are (pairs of) real functions,
+		they may be -exported and -imported, may be called
+		with module prefixes, can be replaced by hot loading,
+		should be traceable, debuggable, profilable, and so
+		on, just like other functions.  In Stage 2, exported
+		abstract patterns would need inline declarations if
+		they are to be inlined; other patterns would continue
+		to be inlined except when compiled in debugging mode.
+
+		This requires fairly substantial changes to the
+		run time system.  The big payoff here is that
+		imported abstract patterns can be replaced by hot
+		loading, unlike macros.
+
+    Stage 3:	#fun [Module:]Name/Arity and
+		#fun (P1, ..., Pn) when G -> B end
+		forms are introduced, and a metacall
+		#Var(E1,...,En) is added.
+
+		This requires extensions to the Erlang term
+		representation and the VM.  The gain here is that
+		the FAQ "how do I pass a pattern as a parameter"
+		finally gets a safe answer.  For example,
+
+		collect_messages(P) ->
+		    lists:reverse(collect_messages_loop(P, [])).
+
+		collect_messages_loop(P, Ms) ->
+		    receive M = #P() -> collect_messages_loop([M|Ms])
+		      after 0        -> Ms
+		    end.
+
+		gathers all the messages currently in the mailbox
+		that match a pattern passed as a parameter.
+
+    Stage 4:	<expression>#<pattern call> field update,
+		as described in the original proposal.
+
+    Stage 5:	Multi-clause abstract patterns,
+		as described in the original proposal.
+		Multi-clause abstract patterns CAN handle
+		examples like ?get_max and ?LOWER, which makes
+		them even more useful in guards, but more than
+		a little dubious as patterns.
+
+    Stage 6:	"Hybrid" abstract patterns, where in #A/M+N the
+		first M arguments are always inputs, and only
+		the last N are outputs.  This one isn't actually
+		my idea.  The example
+		    #range(L, U, N)
+		    when is_integer(N), L =< N, N =< U
+		    -> N.
+		comes from the mailing list.  I don't like this very
+		much, and note that for some purposes,
+		   range(L, U) ->
+		       #fun(N) when is_integer(N), L =< N, N =< U
+		               -> N end.
+		can do the same job.
+
+    What I've done for this proposal is to strip away everything
+    that isn't essential.  We get data abstraction, user defined
+    guard tests and functions, and a replacement for many uses
+    of macros, without run time overheads and without changes to
+    anything except the compiler front end, assuming that Stage 0
+    is done first.
+
+
+
+Backwards Compatibility
+
+    Erlang currently uses the sharp sign for record syntax.
+    Since record syntax uses curly braces, and abstract patterns
+    use round parentheses, no existing code should be affected.
+
+
+
+Reference Implementation
+
+    Sketched above.  Given stage 0, this stage 1 is within my
+    knowledge and abilities, but I don't understand the Erlang
+    VM well enough to do stage 0.
+
+
+
+References
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:
+
+
+
