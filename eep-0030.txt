@@ -1,0 +1,199 @@
+EEP: 30
+Title: Maximum and Minimum
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe < ok (at) cs (dot) otago (dot) ac (dot) nz >
+Status: Draft
+Type: Standards Track
+Erlang-Version: R12B-4
+Content-Type: text/plain
+Created: 10-Jul-2008
+Post-History:
+
+
+
+Abstract
+
+    Add maximum and minimum operators.
+
+
+
+Specification
+
+    Currently the Erlang language has no built-in support for
+    the maximum and minimum operations.  So we add
+
+    /\  with the same precedence and associativity as band
+    \/  with the same precedence and associativity as bor
+
+    E1 /\ E2 has the same effects and value as
+	(T1 = E1, T2 = E2, if T1 > T2 -> T2 ; true -> T1 end)
+    E1 \/ E2 has the same effects and value as
+	(T1 = E1, T2 = E2, if T1 > T2 -> T1 ; true -> T2 end)
+    except that we expect them to be implemented using single VM
+    instructions, and we expect HiPE to use conditional moves on
+    machines that have them.
+
+
+
+Motivation
+
+    Maximum and minimum are extremely useful operations.
+    The fact that there is no standard way to express them in Erlang
+    has had the predictable result:  there are definitions of max/2
+    in tool_utils, tv_pg_gridfcns, tv_pb, tv_comm_func,
+    ssh_connection_handler, bssh_connection_handler, ssh_cli,
+    hipe_arm, hipe_schedule, hipe_ultra_prio, hipe_ppc_frame,
+    ?HIPE_X86_FRAME (presumably one each for 32- and 64-bit PCs),
+    hipe_sparc_frame, erl_recomment, erl_syntax_lib, appmon_info,
+    oh, the list goes on and on.  There are dozens of copies.
+    There are nearly as many copies of min/2.  And that's leaving
+    aside possible copies with different names.
+
+    Not only are the operations useful, they can be implemented
+    more efficiently by the compiler than by the programmer.
+    If X < Y can be a VM instruction, so can min and max.
+    Here's a first draft implementation:
+
+	OpCase(i_minimum): {
+	    r(0) = CMP_GT(tmp_arg1, tmp_arg2)) ? tmp_arg1 : tmp_arg2;
+	    Next(1);
+	}
+	OpCase(i_maximum): {
+	    r(0) = CMP_GT(tmp_arg1, tmp_arg2)) ? tmp_arg2 : tmp_arg1;
+	    Next(1);
+	}
+
+    Beware: untested code!  Amongst other things, I don't know all the
+    places that need to be updated, or how, when new instructions are
+    added.  These instructions are intended to be preceded by an
+    i_fetch instruction the way < and its other friends are.
+
+    This is much cheaper than an Erlang function call, and it's much
+    easier for HiPE to recognise when a maximum or minimum of two
+    floating point numbers is involved and can be turned into a
+    compare and a conditional move.
+
+    The most important thing is the barrier to thought that is
+    removed.  When I'm writing Fortran, I know that max and min have
+    been there for decades, and I use those operations freely.
+    When I'm writing C, I know that those operations are not there,
+    and that there are problems with the conventional macros, so
+    I avoid them.  As an experiment, I added max() and min() functions
+    to the version of AWK that I maintain.  It was easy, and the
+    result is that I now have a lot of AWK code that can't be run by
+    anything else, because the operations are so handy.  Erlang has
+    no *documented* maximum or minimum functions other than those in
+    the 'lists' module, and writing lists:max([X,Y]) is sufficiently
+    painful to deter all but the most determined.
+
+
+
+Rationale
+
+    Function or operator?
+
+    The operations /\ and \/ defined in lattice theory are very
+    nice operations indeed.  They are commutative, associative,
+    and idempotent.  So having to choose between max(X,max(Y,Z))
+    and max(max(X,Y),Z) is an unjustifiable burden on the
+    programmer.  Fortran's answer (and Lisp's) is to allow any
+    number of arguments to the max and min functions.  That is
+    not something that suits Erlang.
+
+    Another argument against a function is the risk of clashing
+    with the very many existing definitions of max and min.
+
+    Should an operator be alphabetic or symbolic?
+    Adding new alphabetic operators creates problems for people
+    who are already using the atom in question.
+    However, it may be justifiable when there is no widely
+    accepted notation for the operation that can be readily
+    expressed in widely used character sets.
+
+    Maximum and minimum DO have very well established mathematical
+    symbols.  In ASCII, those symbols look like /\ and \/.
+    In fact, /\ and \/ are *precisely* what the backslash character
+    in ASCII exists for; it had no other original purpose.
+
+    If Erlang were C, the (sole originally intended) use of the
+    backslash here would be a lexical problem.  But it isn't.
+    Backslash is used for character escapes in Erlang, and using
+    it in operators in no way conflicts with that.
+
+    The remaining question is the precedence level.
+    `band' is the specialisation of /\ to the bit string lattice.
+    `and'  is the specialisation of /\ to the false < true lattice.
+    Those operators have the same precedence, so /\ should agree.
+    `bor'  is the specialisation of \/ to the bit string lattice.
+    `or'   is the specialisation of \/ to the false < true lattice.
+    Those operators have the same precedence, so \/ should agree.
+
+    Imagine that you want to find the bounding box for a set
+    of 2D points.  (This is adapted from code in Wings3D.)
+
+    bounding_box([{X0,Y0}|Pts]) ->
+	bounding_box(Pts, X0,X0, Y0,Y0).
+
+    bounding_box([{X,Y}|Pts], Xlo,Xhi, Ylo,Yhi) ->
+        if X < Xlo -> Xlo1 = X,   Xhi1 = Xhi
+         ; X > Xhi -> Xlo1 = Xlo, Xhi1 = X
+         ; true    -> Xlo1 = Xlo, Xhi1 = Xhi
+        end,
+        if Y < Ylo -> Ylo1 = Y,   Yhi1 = Yhi
+         ; Y > Yhi -> Ylo1 = Ylo, Yhi1 = Y
+         ; true    -> Ylo1 = Ylo, Yhi1 = Yhi
+        end,
+        bounding_box(Pts, Xlo1,Xhi1, Ylo1,Yhi1);
+    bounding_box([], Xlo,Xhi, Ylo,Yhi) ->
+	{{Xlo,Ylo}, {Xhi,Yhi}}.
+
+    With maximum and minimum operators, this becomes
+
+    bounding_box([{X,Y}|Pts], Xlo,Xhi, Ylo,Yhi) ->
+        bounding_box(Pts, X/\Xlo, X\/Xhi, Y/\Ylo, Y\/Yhi);
+    bounding_box([], Xlo,Xhi, Ylo,Yhi) ->
+	{{Xlo,Ylo}, {Xhi,Yhi}}.
+
+    There is a cultural clash with Prolog, which used /\ and
+    \/ for bitwise and and bitwise or respectively.  Since
+    Erlang has never used these operators for that purpose,
+    the clash always existed anyway.
+
+
+
+Backwards Compatibility
+
+    No issues.
+
+
+
+Reference Implementation
+
+    I don't understand BEAM or the compiler well enough to
+    provide one, but the instruction definitions above are
+    offered as evidence that it should not be hard for those
+    who do.  If this EEP is accepted I will be happy to write
+    the documentation for these operators.
+
+
+
+References
+    
+    http://mathworld.wolfram.com/Lattice.html
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

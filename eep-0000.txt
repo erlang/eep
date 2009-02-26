@@ -53,6 +53,7 @@ Numerical Index
  S          27  Multi-Parameter Typechecking BIFs              James Hague
  S          28  Optional leading semicolons for choices        Richard A. O'Keefe
  S          29  Abstract Patterns, Stage 1                     Richard A. O'Keefe
+ S          30  Maximum and Minimum                            Richard A. O'Keefe
 
 Key
 
