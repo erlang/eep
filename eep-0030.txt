@@ -2,7 +2,7 @@ EEP: 30
 Title: Maximum and Minimum
 Version: $Revision$
 Last-Modified: $Date$
-Author: Richard A. O'Keefe < ok (at) cs (dot) otago (dot) ac (dot) nz >
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
 Status: Draft
 Type: Standards Track
 Erlang-Version: R12B-4
@@ -14,25 +14,28 @@ Post-History:
 
 Abstract
 
-    Add maximum and minimum operators.
+    Add maximum and minimum core functions.
 
 
 
 Specification
 
     Currently the Erlang language has no built-in support for
-    the maximum and minimum operations.  So we add
+    the maximum and minimum operations.  So we add new functions
 
-    /\  with the same precedence and associativity as band
-    \/  with the same precedence and associativity as bor
-
-    E1 /\ E2 has the same effects and value as
+    erlang:min(E1, E2)  with the same effects and value as
 	(T1 = E1, T2 = E2, if T1 > T2 -> T2 ; true -> T1 end)
-    E1 \/ E2 has the same effects and value as
+
+    erlang:max(E1, E2)  with the same effects and value as
 	(T1 = E1, T2 = E2, if T1 > T2 -> T1 ; true -> T2 end)
+
     except that we expect them to be implemented using single VM
     instructions, and we expect HiPE to use conditional moves on
     machines that have them.
+
+    The erlang: module prefix on max/2 (respectively min/2) can
+    be omitted if and only if there is no locally defind max/2
+    (respectively min/2).
 
 
 
@@ -93,41 +96,40 @@ Rationale
 
     Function or operator?
 
-    The operations /\ and \/ defined in lattice theory are very
-    nice operations indeed.  They are commutative, associative,
-    and idempotent.  So having to choose between max(X,max(Y,Z))
-    and max(max(X,Y),Z) is an unjustifiable burden on the
-    programmer.  Fortran's answer (and Lisp's) is to allow any
-    number of arguments to the max and min functions.  That is
-    not something that suits Erlang.
+    I believe that there are excellent reasons to use the standard
+    /\ and \/ symbols from lattice theory.  However, discussion in
+    the EEPs mailing list showed that the community was divided
+    into
+      - people who were familiar with the operators
+      - people who insisted that they were only Boolean operators
+      - people who didn't get them at all because they weren't C.
 
-    Another argument against a function is the risk of clashing
-    with the very many existing definitions of max and min.
+    The ready availability of the operations as a standard part of
+    the language is much more important than what they are called,
+    so the second draft of this EEP switched to built in functions
+    in order to increase acceptance.
 
-    Should an operator be alphabetic or symbolic?
-    Adding new alphabetic operators creates problems for people
-    who are already using the atom in question.
-    However, it may be justifiable when there is no widely
-    accepted notation for the operation that can be readily
-    expressed in widely used character sets.
+    The argument which finally settled it for me was the
+    internationalisation one:  Japanese programmers may be using
+    keyboards where \ means or screens where \ displays as Yen,
+    so /\ and \/ just won't work for them.
 
-    Maximum and minimum DO have very well established mathematical
-    symbols.  In ASCII, those symbols look like /\ and \/.
-    In fact, /\ and \/ are *precisely* what the backslash character
-    in ASCII exists for; it had no other original purpose.
+    We cannot use max and min as operators because the compiler
+    will not let you use a symbol as both an operator and a function
+    name, and there are lots and lots of uses of max and min as
+    function names.  That's precisely the problem we're trying to
+    address here.  So they have to be function names.
 
-    If Erlang were C, the (sole originally intended) use of the
-    backslash here would be a lexical problem.  But it isn't.
-    Backslash is used for character escapes in Erlang, and using
-    it in operators in no way conflicts with that.
+    There is no great difficulty in adding new functions to the
+    erlang: module.
 
-    The remaining question is the precedence level.
-    `band' is the specialisation of /\ to the bit string lattice.
-    `and'  is the specialisation of /\ to the false < true lattice.
-    Those operators have the same precedence, so /\ should agree.
-    `bor'  is the specialisation of \/ to the bit string lattice.
-    `or'   is the specialisation of \/ to the false < true lattice.
-    Those operators have the same precedence, so \/ should agree.
+    I don't want to write the erlang: prefix here.  There is
+    nothing new in making the erlang: prefix for some functions
+    optional either.
+
+    What we want is for existing modules with their own definitions
+    of max/2 and/or min/2 to remain legal, and then to be upgraded
+    simply by removing the redundant definitions.
 
     Imagine that you want to find the bounding box for a set
     of 2D points.  (This is adapted from code in Wings3D.)
@@ -151,20 +153,17 @@ Rationale
     With maximum and minimum operators, this becomes
 
     bounding_box([{X,Y}|Pts], Xlo,Xhi, Ylo,Yhi) ->
-        bounding_box(Pts, X/\Xlo, X\/Xhi, Y/\Ylo, Y\/Yhi);
+        bounding_box(Pts, min(X,Xlo), max(X,Xhi),
+			  min(Y,Ylo), max(Y,Yhi));
     bounding_box([], Xlo,Xhi, Ylo,Yhi) ->
 	{{Xlo,Ylo}, {Xhi,Yhi}}.
-
-    There is a cultural clash with Prolog, which used /\ and
-    \/ for bitwise and and bitwise or respectively.  Since
-    Erlang has never used these operators for that purpose,
-    the clash always existed anyway.
 
 
 
 Backwards Compatibility
 
-    No issues.
+    No issues.  Where a module already has max/2 or min/2,
+    the erlang: prefix is required to get the new function.
 
 
 
