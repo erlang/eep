@@ -86,9 +86,9 @@ Owners
     Richard A. O'Keefe   <ok (at) cs (dot) otago (dot) ac (dot) nz>
     James Hague          <james (dot) hague (at) gmail (dot) com>
 
-EEPs are discussed on the mailing list eeps (at) erlang (dot) org and
-accepted or rejected by the OTP team. See
-http://www.erlang.org/eep.html and http://www.erlang.org/faq.html.
+    EEPs are discussed on the mailing list eeps (at) erlang (dot) org and
+    accepted or rejected by the OTP team. See
+    http://www.erlang.org/eep.html and http://www.erlang.org/faq.html.
 
 References
 
