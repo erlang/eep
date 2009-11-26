@@ -54,6 +54,7 @@ Numerical Index
  S          28  Optional leading semicolons for choices        Richard A. O'Keefe
  S          29  Abstract Patterns, Stage 1                     Richard A. O'Keefe
  S          30  Maximum and Minimum                            Richard A. O'Keefe
+ S          31  Binary manipulation and searching module       Patrik Nyblom
 
 Key
 
@@ -85,21 +86,16 @@ Owners
     Richard A. O'Keefe   <ok (at) cs (dot) otago (dot) ac (dot) nz>
     James Hague          <james (dot) hague (at) gmail (dot) com>
 
-EEP editor(s) committee
-
-    name                 position
-    ----------------     --------
-    Kenneth Lundin       Ericsson, Head of Erlang/OTP development team
-    Ulf Wiger            Ericsson
-    Kostis Sagonas       Uppsala University, director of the HiPE group
-    Joe Armstrong        Ericsson, one of the original inventors of Erlang
-    Robert Virding       One of the original inventors of Erlang
-    Richard Carlsson     IAR Systems, former member of the HiPE group
+EEPs are discussed on the mailing list eeps (at) erlang (dot) org and
+accepted or rejected by the OTP team. See
+http://www.erlang.org/eep.html and http://www.erlang.org/faq.html.
 
 References
 
     [1] View EEP history online
         http://www.erlang.org/svn/projects/eeps/trunk/
+    [2] EEP Homepage
+        http://www.erlang.org/eep.html
 
 
 Local Variables:
