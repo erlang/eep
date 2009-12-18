@@ -1,7 +1,7 @@
 EEP:            31
 Title:          Binary manipulation and searching module
-Version:        $Id: eep-0031.txt,v 1.1 2009/11/26 13:13:37 pan Exp pan $
-Last-Modified:  $Date: 2009/11/26 13:13:37 $
+Version:        1.2
+Last-Modified:  18-Dec-2009 12:12
 Author:         Patrik Nyblom, Fredrik Svahn
 Status:         Draft
 Type:           Standards Track
