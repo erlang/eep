@@ -2,7 +2,7 @@ EEP:            31
 Title:          Binary manipulation and searching module
 Version:        $Id: eep-0031.txt,v 1.1 2009/11/26 13:13:37 pan Exp pan $
 Last-Modified:  $Date: 2009/11/26 13:13:37 $
-Author:         Patrik Nyblom
+Author:         Patrik Nyblom, Fredrik Svahn
 Status:         Draft
 Type:           Standards Track
 Content-Type:   text/x-rst
@@ -46,6 +46,13 @@ However some common operations are useful to have as ordinary functions,
 both for performance and to support a more traditiona functional
 programming style.
 
+Some operations for converting lists to binaries and v.v. are today in
+the erlang module. BIFs concerning binaries now present have varied
+view of zero vs. one-based positioning in binaries. I.e.
+binay_to_list/3 uses one-based while split_binary/2 uses
+zero-based. As the convention is to use zero-based, new functions for
+convertion binaries to lists and v.v. are needed.
+
 Binaries are in fact a shared data-type, with small binaries often
 referencing parts of larger binaries in a way not controllable by
 the programmer in a simple way. The bitstring data-type further
@@ -53,6 +60,11 @@ complicate things to the programmer in a way hard to easily
 manage. I therefore also suggest some low level functions to
 inspect binary representation and to clone binaries to ensure a
 minimal representation.
+
+As matching is not allowed in guard expressions, I furthermore suggest
+that a function for extracting parts of binaries is added to the set
+of guard BIFs. This would be consistent with the function element/2
+being allowed in guards.
 
 Rationale
 =========
@@ -82,6 +94,9 @@ The functionality suggested is the following:
   also provides a good place for future operations on binaries,
   operations that are not applicable to lists or that we still don't
   know the need for.
+
+- Functions for converting lists to binaries and v.v. These functions
+  should have a consistent view of zero-based indexing in binaries.
 
 - Operations on binaries concerning their internal
   representation. This functionality is sometimes necessary to avoid
@@ -147,6 +162,12 @@ search-pattern, later to be used in the find, split or replace
 functions. The cp() returned is guaranteed to be a tuple() to allow
 programs to distinguish it from non precompiled search patterns
 
+When a list of binaries is given, it denotes a *set* of alternative
+binaries to search for. I.e if ``[<<"functional">>, <<"programming">>]`` 
+is given as ``Pattern``, this means ''either ``<<"functional">>`` *or*
+``<<"programming">>``''. The pattern is a *set* of alternatives; when
+only a single binary is given, the set has only one element. 
+
 If pattern is not a binary or a flat proper list of binaries, a ``badarg``
 exception will be raised.
 
@@ -182,8 +203,7 @@ the lowest position in ``Subject``, Example::
 
 Even though ``<<"cd">>`` ends before ``<<"bcde">>``, ``<<"bcde">>``
 begins first and is therefore the first match. If two overlapping
-matches begins at the same position, the shortest is returned.
-
+matches begins at the same position, the longest is returned.
 
 Summary of the options:
 
@@ -194,6 +214,8 @@ Summary of the options:
 
 The found part() is returned, if none of the strings in ``Pattern`` is
 found, the atom ``no`` is returned.
+
+For a descrition of ``Pattern``, see ``compile_pattern/1``.
 
 If ``{scope, {Start,Length}}`` is given in the options such that
 ``Start`` is larger than the size of ``Subject``, ``Start`` +
@@ -211,6 +233,9 @@ Types:
 The same as matches(Subject, Pattern, []).
 
 **matches(Subject,Pattern,Options) -> Found**
+
+Types:
+
 - Subject = binary()
 - Pattern = binary() | [ binary() ] | cp()
 - Found = [ part() ] | []
@@ -220,17 +245,29 @@ The same as matches(Subject, Pattern, []).
 Works like match, but the ``Subject`` is search until exhausted and
 a list of all non-overlapping parts present in Pattern are returned (in order).
 
-The first and shortest match is preferred
-to a longer, which is illustrated by the following example::
+The first and *longest* match is preferred
+to a shorter, which is illustrated by the following example::
 
     1> binary:matches(<<"abcde">>, [<<"bcde">>,<<"bc">>>,<<"de">>],[]).
-    [{1,2},{3,2}]
+    [{1,4}]
 
-\- the result shows that ``<<"bc">>>`` and then ``<<"de">>`` are
-selected instead of the longer match ``<<"bcde">>``. This corresponds
-to the default behavior of regular expressions in the ``re`` module.
+\- the result shows that ``<<"bcde">>>`` is selected instead of the
+shorter match ``<<"bc">>`` (which would have given raise to one more
+match,``<<"de">>``). This corresponds to the behavior of
+posix regular expressions (and programs like ``awk``), but is not
+consistent with alternative matches in ``re`` (and Perl), where
+instead lexical ordering in the search pattern selects which string
+matches.
 
 If none of the strings in pattern is found, an empty list is returned.
+
+For a descrition of ``Pattern``, see ``compile_pattern/1`` and for a
+desctioption of available options, see ``match/3``.
+
+If ``{scope, {Start,Length}}`` is given in the options such that
+``Start`` is larger than the size of ``Subject``, ``Start`` +
+``Length`` is less than zero or ``Start`` + ``Length`` is larger than
+the size of ``Subject``, a ``badarg`` exception is raised.
 
 **split(Subject,Pattern) -> Parts**
 
@@ -299,6 +336,8 @@ The return type is always a list of binaries which are all referencing
 copied to new binaries and that ``Subject`` cannot be garbage
 collected until the results of the split are no longer referenced.
 
+For a descrition of ``Pattern``, see ``compile_pattern/1``.
+
 **replace(Subject,Pattern,Replacement) -> Result**
 
 Types:
@@ -350,6 +389,42 @@ If any position given in InsPos is greater than the size of the replacement bina
 The options ``global`` and ``{scope, part()}`` works as for
 ``binary:split/3``. The return type is always a binary.
 
+For a descrition of ``Pattern``, see ``compile_pattern/1``.
+
+**longest_common_prefix(Binaries) -> int()**
+
+Types:
+
+- Binaries = [ binary() ]
+
+Returns the length of the longest common prefix of the binaries in the
+list ``Binaries``. Example::
+
+     1> binary:longest_common_prefix([<<"erlang">>,<<"ergonomy">>]).
+     2
+     2> binary:longest_common_prefix([<<"erlang">>,<<"perl">>]).
+     0
+
+If ``Binaries`` is not a flat list of binaries, a ``badarg`` exception
+is raised. 
+
+**longest_common_suffix(Binaries) -> int()**
+
+Types:
+
+- Binaries = [ binary() ]
+
+Returns the length of the longest common suffix of the binaries in the
+list ``Binaries``. Example::
+
+     1> binary:longest_common_suffix([<<"erlang">>,<<"fang">>]).
+     3
+     2> binary:longest_common_suffix([<<"erlang">>,<<"perl">>]).
+     0
+
+If ``Binaries`` is not a flat list of binaries, a ``badarg`` exception
+is raised. 
+
 **first(Subject) -> int()**
 
 Types:
@@ -379,7 +454,6 @@ Returns the byte at position ``Pos`` (zero-based) in the binary
 ``Subject`` as an integer. If ``Pos`` >= byte_size(Subject), a
 ``badarg`` exception is raised.
 
-
 **part(Subject, PosLen) -> binary()**
 
 Types:
@@ -408,6 +482,48 @@ Types:
 
 The same as part(Subject, {Pos, Len}). 
 
+**bin_to_list(Subject) -> list()**
+
+Types:
+ 
+- Subject = binary()
+
+The same as bin_to_list(Subject,{0,byte_size(Subject)}).
+
+**bin_to_list(Subject, PosLen) -> list()**
+
+- Subject = binary()
+- PosLen = part()
+
+Converts ``Subject`` to a list of int(), each int representing the
+value of one byte. The ``part()`` denotes which part of the
+``binary()`` to convert. Example::
+
+	     1> binary:bin_to_list(<<"erlang">>,{1,3}).
+	     "rla"
+	     %% or [114,108,97] in list notation.
+
+If ``PosLen`` in any way references outside the binary, a ``badarg``
+exception is raised.
+
+**bin_to_list(Subject, Pos, Len) -> list()**
+
+Types:
+ 
+- Subject = binary()
+- Pos = int()
+- Len = int()
+
+The same as bin_to_list(Subject,{Pos,Len}).
+
+**list_to_bin(ByteList) -> binary()**
+
+Types:
+
+- ByteList = iodata() (see module erlang)
+
+Works exactly like erlang:list_to_binary/1, added for completeness.
+
 **copy(Subject) -> binary()**
 
 Types:
@@ -429,6 +545,13 @@ times.
 This function will always create a new binary, even if ``N`` = 1. By
 using ``copy/1`` on a binary referencing a larger binary, one might
 free up the larger binary for garbage collection.  
+
+NOTE! By deliberately copying a single binary to avoid referencing a
+larger binary, one might, instead of freeing up the larger binary for
+later garbage collection, create much more binary data than
+needed. Sharing binary data is usually good. Only in special cases,
+when small parts reference large binaries and the large binaries are
+no longer used *in any process*, deliberate copying might be a good idea.
 
 If ``N`` < 0, a ``badarg`` exception is raised.
 
@@ -478,6 +601,12 @@ Example of binary sharing::
         10
 	6> binary:referenced_byte_size(B)
 	100
+
+NOTE! Binary data is shared among processes. If another process still
+references the larger binary, copying the part this process uses only
+consumes more memory and will not free up the larger binary for garbage
+collection. Use this kind of intrusive functions with extreme care,
+and only if a *real* problem is detected.
 	
 **encode_unsigned(Unsigned) -> binary()**
 
@@ -527,6 +656,19 @@ Example::
 
 	1> binary:decode_unsigned(<<169,138,199>>,big). 
         11111111
+
+Guard BIF
+---------
+
+I suggest adding the functions binary:part/2 and binary:part/3 to the
+set of BIFs allowed in guard tests. As guard BIFs are traditionally
+put in the erlang module, the following names for the guard BIFs are
+suggested::
+
+	erlang:binary_part/2
+	erlang:binary_part/3
+
+They should both work exactly as their counterparts in the binary module.
 
 Interface design discussion
 ---------------------------
