@@ -1,0 +1,573 @@
+EEP: 32
+Title: Module-local process names
+Version: $Revision$
+Last-Modified: $Date$
+Author: Richard A. O'Keefe <ok@cs.otago.ac.nz>
+Status: Draft
+Type: Standards Track
+Erlang-Version: R13B-3
+Content-Type: text/plain
+Created: 09-Feb-2010
+
+Abstract
+
+    The process registry in Erlang is convenient, but counts as
+    a global shared mutable variable, with two major defects:
+    the possibility of data races (shared mutable variable) and
+    the impossibility of encapsulation (global).  This EEP
+    resurrects the old (1997 or earlier) proposal of module-
+    local process-valued variables, providing a replacement for
+    node-local uses of the registry with encapsulation and without
+    races.
+
+
+
+Specification
+
+    A module (or an instance of a parameterized module) may have
+    one or more top level pid-valued variables, and if so, has a
+    lock associated with them.  The directive has the form
+
+	-pid_name(Atom).
+
+    where Atom is an atom.  To avoid confusing programmers who
+    still have to deal with the registry, this Atom may not be
+    'undefined'.
+
+    If there is at least one such directive in a module, the
+    compiler automatically generates a function called
+    pid_name/1.  In the scope of directives
+
+	-pid_name(pn_1).
+	...
+	-pid_name(pn_k).
+
+    the pid_name/1 function is rather like
+
+	pid_name(pn_1) ->
+	    with_module_lock(read) -> X = *pn_1 end, X;
+	...
+	pid_name(pn_k) ->
+	    with_module_lock(read) -> X = *pn_k end, X.
+	    
+    except that we expect there to be a VM instruction
+    get_pid_safely(Address), and we expect the compiler to
+    inline calls to pid_name(Atom) when Atom is known.
+    On a machine like the X86 or X86_64, this could be a
+    single locked load instruction.
+
+    The value of a -pid_name is always a process id.    
+    There is a special process id value which at all times represents
+    a dead process.  So within a module,
+
+    	pid_name(X) ! Message
+
+    is legal if and only if X is one of the pid-names declared in
+    the module, and whether or not the process it names has died.
+
+    If there is a need to discover whether a -pid_name has within
+    the recent but unpredictable past been associated with a live
+    process, that can be found out by combining pid_name/1 with
+    process_info/2.
+
+    As with the registry, a process may have at most one pid_name.
+    For debugging purposes, I suppose that process_info could be
+    extended to return a {pid_name,{Module,Name}} tuple.
+
+    When a process exits, it is automatically unregistered.
+    That is, if it was bound to a -pid_name, that -pid_name
+    now refers to the conventional dead process.  This draft of
+    this EEP includes no other way for a process to be unregistered.
+
+    The important thing about registering a process is that it
+    should be atomic.  So there are two new functions
+
+	pid_name_spawn(Name, Fun)
+	pid_name_spawn_link(Name, Fun)
+
+    We can understand them as
+
+	pid_name_spawn(Name, Fun)
+	  when is_atom(Name), is_function(Fun, 0) ->
+	    with_module_lock(write) ->
+		P = *Name,
+		if P is a live process ->
+		    P
+		 ; P is a dead process ->
+		    Q = spawn(Fun),
+		    *Name := Q,
+		    Q
+		end
+	    end.
+
+	pid_name_spawn_link(Name, Fun)
+	  when is_atom(Name), is_function(Fun, 0) ->
+	    with_module_lock(write) ->
+		P = *Name,
+		if P is a live process ->
+		    P
+		 ; P is a dead process ->
+		    Q = spawn(Fun),
+		    *Name := Q,
+		    Q
+		end
+	    end.
+
+    Here, as earlier, "with_module_lock" is pseudo-code, meant to
+    suggest some sort of reader-writer locking on a private lock,
+    existing only inside a module that has declared a -pid_name.
+
+    These two functions are automatically declared inside the
+    module, like pid_name/1.  The three functions are not functions
+    automatically inherited from the erlang: module but functions
+    that are logically inside the module, however they might be
+    actually implemented.  There doesn't seem to be any good
+    reason for a module to export any of these functions, and the
+    compiler should at least warn if that is attempted.
+
+
+Motivation
+
+    Encapsulation.
+
+	The process registry is often used when clients of a module
+	need to communicate with one or more servers managed by the
+	module, but the interface code is inside the module.  There
+        is no advantage, and much risk, in exposing the process.  A
+        big reason for this process is to get the benefit of having
+        mutable process variables without the loss of encapsulation.
+
+    Efficiency.
+
+        As a shared mutable data structure, the registry has to be
+        accessed within the scope of suitable locks.  With this
+        approach, each module has its own lock, contention ought
+        to be pretty nearly zero, and the commonest use case of
+        the registry can, I believe, be a simple load instruction.
+
+    Safety.
+
+	It is actually surprisingly hard to register a process
+	safely, and the use of registered names is oddly inconsistent
+        with the use of direct process ids.  This interface is meant
+        to be simpler to use safely.
+
+
+
+Rationale
+
+    The old Erlang book describes four functions for dealing with
+    registered process names.  There are two more main interfaces.
+
+	Name ! Message when is_atom(Name) ->
+	  % Also available as erlang:send(Name, Message).
+	  % A 'badarg' exception results if Pid is an atom that is
+	  % not the registered name of a live local process or port.
+	    whereis(Name) ! Message.
+
+	register(Name, Pid) when is_atom(Name), is_pid(Pid) ->
+	  % A 'badarg' exception results if Pid is not a live local
+	  % process or port, if Name is not an atom or is already in
+	  % use, if Pid already has a registered name, or if Name is
+	  % 'undefined'.
+	    "whereis(Name) := Pid".
+
+	unregister(Name) when is_atom(Name) ->
+	  % A 'badarg' exception results if Name is not an atom
+	  % currently in use as the registered name of some process
+	  % or port.  'undefined' is always an error.
+	    "whereis(Name) := undefined".
+
+	whereis(Name) when is_atom(Name) ->
+	  % A 'badarg' exception results if Name is not a name.
+	  % in effect, a global mutable hash table with
+	  % atom keys and pid-or-'undefined' values.
+
+	registered() ->
+	    % yes, I know this is not executable Erlang.
+	    [Name || is_atom(Name), is_pid(whereis(Name))].
+
+	process_info(Pid, registered_name) when is_pid(Pid) ->
+	    % yes, I know this is not executable Erlang.
+	    case [Name || is_atom(Name), whereis(Name) =:= Pid]
+	      of [N] -> {registered_name,N}
+	       ; []  -> []
+	    end.
+
+    When a process terminates, for whatever reason, it does the
+    equivalent of
+	case process_info(self(), registered_name)
+	  of {_,Name} -> unregister(Name)
+	   ; []       -> ok
+	end.
+
+    This has an astonishing consequence.
+
+    Suppose I do
+
+	Pid = spawn(Fun),
+	...
+	Pid ! Message
+
+    and between the time the process was created and the time I send
+    the message to it, the process dies.  In Erlang this is
+    perfectly ok, and the message just disappears.
+
+    Now suppose I do
+
+	register(Name, spawn(Fun)),
+	...
+	Name ! Message
+
+    and between the time the process was created and the time I send
+    the message to it, the process dies.  Anyone would expect the
+    result to be exactly the same: because the Name pointed to a
+    process which has died, this amounts to sending a message to a
+    dead process, which is perfectly ok, and the message just
+    disappears.  Most confusingly, that is not what happens, and
+    instead you get a 'badarg' exception.
+
+    Now suppose I do
+
+    send(Pid, Message) when is_pid(Pid) ->
+        Pid ! Message;
+    send(Name, Message) when is_atom(Name) ->
+        case whereis(Name)
+          of undefined -> ok
+           ; Pid when is_pid(Pid) -> Pid ! Message
+        end.
+    ...
+	register(Name, spawn(Fun)),
+	...
+	send(Name, Message)
+
+    This works the way we would expect, but why is it necessary?
+
+    In Erlang as it stands, Name ! Message will raise an error if
+    Name would have referred to the right process but that process
+    has died.  It might be argued that this is a useful debugging
+    aid, but nothing helps us if Name now refers to the WRONG
+    process.  Right now, consider
+
+	whereis(Name) ! Message
+
+    This will raise an exception if the named process had died
+    before whereis/1 was called, but consider this timing:
+	live           dies
+          whereis runs      message sent
+    A slight change in timing can unpredictably change the
+    behaviour from silence-on-late-death to error-on-early-death
+    and vice versa.
+
+	pid_name(Name) ! Message
+
+    is *consistently* silent.
+
+    The current process registry is also used for ports, which act in
+    many ways like processes.
+
+    The old Erlang book is absolutely right that sometimes you
+    need a way to talk to a process you haven't been previously
+    introduced to.  However, it is not true that this must be
+    done by means of a global hash table.  You could always ask
+    a module for the information.
+
+    Let's take program 5.5 from the book.
+
+        -module(number_analyser). 
+	-export([start/0,server/1]). 
+	-export([add_number/2,analyse/1]). 
+
+	start() -> 
+	    register(number_analyser, 
+		spawn(number_analyser, server, [nil])). 
+
+	%% The interface functions. 
+
+	add_number(Seq, Dest) -> 
+	    request({add_number,Seq,Dest}). 
+
+	analyse(Seq) -> 
+	    request({analyse,Seq}). 
+
+	request(Req) -> 
+	    number_analyser ! {self(), Req}, 
+	    receive 
+		{number_analyser,Reply} -> 
+	            Reply 
+	    end. 
+
+	%% The server. 
+
+	server(Analyser_Table) -> 
+	    receive 
+	        {From, {analyse, Seq}} -> 
+		    Result = lookup(Seq, Analyser_Table), 
+		    From ! {number_analyser, Result}, 
+		    server(Analyser_Table)
+	      ; {From, {add_number, Seq, Dest}} -> 
+		    From ! {number_analyser, ack}, 
+		    server(insert(Seq, Dest, Analyser_Table)) 
+	    end. 
+
+    The first thing we notice about this is that the registry is used
+    to allow a process that is a client of this module to communicate
+    with a process managed by this module through interface functions
+    in this module.  There is no reason why the process should be
+    given a GLOBALLY visible name, and every reason why it should NOT.
+    We would like to ensure that all communication with the server
+    process goes through the interface functions, and as long as the
+    process is in a global registry, anything could happen.  The
+    global process registry thus defeats its own purpose.
+
+    Similarly, because the reply messages to the interface functions
+    are tagged, not with the server's identity, but with its public
+    name, they are easy to forge.  Both of these problems also apply
+    to Program 5.6 in the old book.
+
+    But there is worse.  It is NEVER safe to call register/2 or
+    unregister/1.  Recall that the precondition for register/2
+    requires that the Name not be in use.  But there is no way to
+    ever be sure of that.  For example, you might try
+
+	spawn_if_necessary(Name, Fun) ->
+	    case whereis(Name)		% T1
+	      of undefined ->
+		 Pid = spawn(Fun),	% T2
+		 register(Name, Pid)	% T3
+	       ; Pid when is_pid(Pid) ->
+	         ok
+	    end,
+	    Pid.
+
+    Unfortunately, between time T1, when whereis/1 reports that the
+    Name is not in use, and time T3, when we try to assign it, some
+    other process might have been registered.  Also, between time T2,
+    when the new process is created, and T3, when we use the Pid, the
+    process might have died.
+
+    Because the registry is global, it is no use searching existing
+    code to see whether the Name is clobbered; the bug might be
+    introduced in future code.
+
+    There appears to be no way to protect against the possibility of a
+    process dying between T2 and T3.  The obvious hack,
+
+	Pid = spawn(Fun),
+	erlang:suspend_process(Pid),
+	register(Name, Pid),
+	erlang:resume_process(Pid)
+
+    won't work because erlang:suspend_process/1 is documented as
+    having the same 'badarg if Pid is not the pid of a live local
+    process' snafu as register/2.  The only really safe way around the
+    issue would be for the new process to be born suspended, and
+    there's no way to do that.  There is no 'suspended' option allowed
+    in the options list of spawn_opt/[2-5].
+
+    In practice, of course, the new process WON'T die, typically
+    because it goes into a loop waiting for a message.  Even so, this
+    amount of fragility in a primitive is a bit worrying.
+
+    Let's take a quick check to see how real all this is.
+    sounder.erl has
+
+    start() ->
+	case whereis(sounder) of
+	    undefined ->
+		case file:read_file_info('/dev/audio') of
+		    {ok, FI} when FI#file_info.access==read_write ->
+			register(sounder, spawn(sounder,go,[])),
+			ok;
+		    _Other ->
+			register(sounder, spawn(sounder,nosound,[])),
+			silent
+		end;
+	    _Pid ->
+		ok
+	end.
+
+    Here's a curious thing:  the first time sounder:start/0 is
+    called, it will return different values (ok, silent) depending
+    on whether sound (is, is not) supported.  Later calls always
+    return ok.  This contradicts the documentation.  Whoops!
+    Apart from that, it's a straightforward spawn_if_necessary.
+
+    man.erl has
+
+    start() ->
+	case whereis(man) of
+	    undefined ->
+		register(man,Pid=spawn(man,init,[])),
+		Pid;
+	    Pid ->
+		Pid
+	end.
+
+    This is precisely
+
+	start() -> spawn_if_necessary(fun () -> man:init() end).
+
+    tv_table_owner has
+
+    start() ->
+	case whereis(?REGISTERED_NAME) of
+	    undefined ->
+		ServerPid = spawn(?MODULE, init, []),
+		case catch register(?REGISTERED_NAME, ServerPid) of
+		    true ->
+			ok;
+		    {'EXIT', _Reason} ->
+			exit(ServerPid, kill),
+			timer:sleep(500),
+			start()
+		end;
+	    Pid when is_pid(Pid) ->
+		ok
+	end.
+
+    Let's repackage that to see what's going on:
+
+	spawn_if_necessary(Name, Fun) ->
+	    case whereis(Name)
+	      of undefined ->
+	         Pid = spawn(Fun),		    
+	         case catch register(Name, Pid)
+	           of true ->
+	              Pid
+	            ; {'EXIT', _} ->
+	              exit(Pid, kill),
+	              timer:sleep(500),
+	              spawn_if_necessary(Name, Fun)
+	         end
+	       ; Pid when is_pid(Pid) ->
+		 ok
+	    end.
+
+    If there is a live local process registered under Name, return its
+    Pid.  Of course, after the function returns to believe that there
+    is STILL a live local process registered under Name, but that's
+    just as true of whereis/1.
+
+    If there is not, then create a new process, regardless of whether
+    that turns out to be useful.  Try to register it.  The Pid will be
+    the pid of a live local process that is not registered under any
+    other name, and Name must be an atom other than 'undefined', or
+    whereis/1 would have crashed.  So it should be that the only thing
+    that can go wrong is that some other process has snuck in and
+    swiped the registry slot.  In that case, kill the process, wait a
+    long time, and try again.
+
+    In theory, it is possible for this to loop forever, with just the
+    right malevolent timing by an adversary.  In practice, I'm sure it
+    works very well.
+
+    The thing is, if the 'primitives' are this fragile, I would rather
+    not expose beginners to them.  Or for that matter, most people:
+    there are plenty of uses of register/1 in the Erlang/OTP sources
+    that are not this well protected.
+
+    The simplest fix to the 'registration race' problem would be to
+    verify that spawn_if_necessary/2 is sound, correct it if
+    necessary, and put it in a library.  However, that does nothing to
+    fix the globality of the registry.
+
+    There is no analogue of registered().  Inside a module, you can
+    see what names are available; outside the module, you have no
+    right to know.
+
+    This EEP does not propose abolishing the old registry.  There
+    is a lot of code, and a lot of training material, that still
+    uses or mentions it.  Above all, the old registry can do one
+    thing that this EEP cannot do and isn't meant to, and that is
+    to provide names that can be used in other nodes, in {Node,Name}
+    form.  The aim of this proposal is to provide something that can
+    replace MOST uses of the registry with something safer, and in
+    particular to allow gradual migration to per-module registration.
+
+
+
+Backwards Compatibility
+
+    The only modules that are affected by the new feature are
+    those that visibly contain an explicit -pid_name directive.
+
+
+
+Reference Implementation
+
+    None.
+
+
+
+References
+    
+    None.
+
+
+
+Example
+
+    Here is the old book's Program 5.5 again, brought up to date.
+
+        -module(number_analyser). 
+	-export([
+	    add_number/2,
+	    analyse/1,
+	    start/0,
+	    stop/0
+         ]).
+	-pid_name(server).
+
+        start() ->
+	    pid_name_spawn(server, fun () -> server(nil) end).
+
+        stop() ->
+	    pid_name(server) ! stop.
+
+	add_number(Seq, Dest) ->
+	    request({add_number,Seq,Dest}).
+
+	analyse(Seq) ->
+	    request({analyse,Seq}).
+
+	request(Request) ->
+            P = pid_name(server),
+	    P ! {self(), Request},
+	    receive {P,Reply} -> Reply end.
+
+	server(Analyser_Table) ->
+	    receive 
+	        {From, {analyse, Seq}} -> 
+		    From ! {self(), lookup(Seq, Analyser_Table)},
+		    server(Analyser_Table)
+	      ; {From, {add_number, Seq, Dest}} -> 
+		    From ! {self(), ok}, 
+		    server(insert(Seq, Dest, Analyser_Table)) 
+	    end. 
+
+
+    It is now possible to use a programming convention where the
+    -pid_name of every server is 'server'.
+
+    It is no longer possible for code outside the module to send
+    messages to the server process.
+
+    It is no longer possible (well, no longer embarrassingly easy)
+    for an outsider to forge responses from the server.
+
+
+
+Copyright
+
+    This document has been placed in the public domain.
+
+
+
+Local Variables:
+mode: indented-text
+indent-tabs-mode: nil
+sentence-end-double-space: t
+fill-column: 70
+coding: utf-8
+End:

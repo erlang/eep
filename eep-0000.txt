@@ -55,6 +55,7 @@ Numerical Index
  S          29  Abstract Patterns, Stage 1                     Richard A. O'Keefe
  S          30  Maximum and Minimum                            Richard A. O'Keefe
  S          31  Binary manipulation and searching module       Patrik Nyblom
+ S          32  Module-local process names                     Richard A. O'Keefe
 
 Key
 
