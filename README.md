@@ -6,11 +6,13 @@ Extension Proposals), in [Markdown][MD] (*.md) format produced in the
 [Erlang Enhancement Process][EEP].
 
 It also contains a version of a [Markdown.pl][] script in subdirectory
-md/ that can be used, for example with the also contained [Makefile][]
-and some Perl build scripts, to produce HTML versions of the *.md EEPs.
+md/ that can be used, for example with the also contained Perl [build
+script][build.pl] and some helper scripts, to produce HTML versions of
+the *.md EEPs.
 
-Just typing `make` in a posix-compatible shell with any old 'make'
-in the path plus a reasonable 'perl' (5.8) should build all HTML.
+Type `perl build.pl` or `./build.pl` depending on your environment to
+rebuild all HTML that needs to be rebuilt. A reasonable 'perl' (5.8) is all
+that is needed.
 
 
 
@@ -23,8 +25,9 @@ in the path plus a reasonable 'perl' (5.8) should build all HTML.
 [EEP]: http://demo.erlang.org/static/dev/eep.html
     "Erlang Enhancement Process"
 
-[Makefile]: Makefile
-    "Makefile"
+[build.pl]: build.pl
+    "Perl build script to overcome Makefile inportability"
+
 
 
 Copyright
@@ -34,3 +37,13 @@ This document has been placed in the public domain.
 
 ### Author
 Erlang/OTP, Raimo Niskanen, 2010
+
+
+
+[EmacsVar]: <> "Local Variables:"
+[EmacsVar]: <> "mode: indented-text"
+[EmacsVar]: <> "indent-tabs-mode: nil"
+[EmacsVar]: <> "sentence-end-double-space: t"
+[EmacsVar]: <> "fill-column: 70"
+[EmacsVar]: <> "coding: utf-8"
+[EmacsVar]: <> "End:"
