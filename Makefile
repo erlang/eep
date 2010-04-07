@@ -6,7 +6,7 @@
 ## Author: Erlang/OTP, Raimo Niskanen
 #
 
-PERL = perl -w -CSD
+PERL = perl -w
 EEPS_DIR = eeps
 MD = md/Markdown.pl
 MK = Makefile
@@ -24,11 +24,15 @@ all: README.html
 	    }' $(EEPS_DIR)`
 
 README.html: README.md $(MK) $(MD)
-	$(PERL) $(MD) $< > $@
+	$(PERL) $(MD) README.md > $@
 
-eeps/eep-0000.html: eeps/eep-*.md $(MK) $(IX) $(PRE)
-	$(PERL) $(IX) eeps/eep-0000.md | $(PERL) $(PRE) |\
+eeps/eep-0000.html: eeps/eep-*.md $(MK) $(IX) $(PRE) $(MD)
+	$(PERL) -CSD $(IX) eeps/eep-0000.md | $(PERL) -CSD $(PRE) | \
 	$(PERL) $(MD) > $@
 
-eeps/eep-%.html: eeps/eep-%.md $(MK) $(MD) $(PRE)
-	$(PERL) $(PRE) $< | $(PERL) $(MD) > $@
+eeps/eep-*.html: $(MK) $(PRE) $(MD)
+
+.SUFFIXES:
+.SUFFIXES: .html .md
+.md.html:
+	$(PERL) -CSD $(PRE) $< | $(PERL) $(MD) > $@
