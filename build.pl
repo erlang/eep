@@ -25,44 +25,45 @@ my $src_ext = '.md';
 my $dst_ext = '.html';
 my @basenames =
     &dir_files($eeps_dir, sub {s/^(eep-\d+)$src_ext$/$1/});
-my $eep_0 = $eeps_dir.'eep-0000';
+my $ix_base = $eeps_dir.'eep-0000';
 
 my %rules =
-    (
-     
-     "README.html" => #target
-     [[\&redirect, "README.html", @perl, $md, "README.md"], #build
-      "README.md", $mk, $md], #deps
+    (# 'target' => [['build commands',...], 'dependencies',...]
 
-     $eep_0.$dst_ext => #target
-     [[\&pipe, @perl, $utf8, $ix, $eep_0.$src_ext,
-       \&pipe, @perl, $utf8, $pre,
-       \&redirect, $eep_0.$dst_ext, @perl, $md], #build
-      $eep_0.$src_ext, $mk, $ix, $pre, $md], #deps
-     
+     "README.html" =>
+     [[@perl, $md, "README.md", \&redirect, "README.html"],
+      "README.md", $mk, $md],
+
+     $ix_base.$dst_ext =>
+     [[@perl, $utf8, $ix, $ix_base.$src_ext, \&pipe,
+       @perl, $utf8, $pre, \&pipe,
+       @perl, $md, \&redirect, $ix_base.$dst_ext],
+      $ix_base.$src_ext, $mk, $ix, $pre, $md],
      );
 # Add rules for wildcard targets
 foreach (@basenames) {
     my $src = $_.$src_ext;
     my $dst = $_.$dst_ext;
     unless (defined $rules{$dst}) {
-	$rules{$dst} = #target
-	    [[\&pipe, @perl, $utf8, $pre, $src,
-	      \&redirect, $dst, @perl, $md], #build
-	     $src, $mk, $pre, $md]; #deps
+	$rules{$dst} =
+	    [[@perl, $utf8, $pre, $src, \&pipe,
+	      @perl, $md, \&redirect, $dst],
+	     $src, $mk, $pre, $md];
     }
 }
 
 
 
+# Find out what to do
 my %mtime;
 my %targets;
 if (defined ($_ = $ARGV[0])) {
-    if (/^(-a|--all)$/) {
+    # Sort out command line arguments
+    if (/^(?:-a|--all)$/) {
 	foreach (keys %rules) { # force build all
 	    $targets{$_} = 1;
 	}
-    } elsif (/^(-c|--clean)$/) {
+    } elsif (/^(?:-c|--clean)$/) {
 	my @files = keys %rules;
 	print "rm @files\n";
 	unlink @files;
@@ -70,6 +71,7 @@ if (defined ($_ = $ARGV[0])) {
     } else {
 	shift if /^--$/; # only targets after this
 	foreach (@ARGV) {
+	    defined $rules{$_} or die "Unknown target: $_";
 	    $targets{$_} = 1; # force build
 	}
 	foreach (keys %rules) { # build only forced
@@ -77,31 +79,40 @@ if (defined ($_ = $ARGV[0])) {
 	}
     }
 } else {
-    # Look up modification time for all files
+    # Build outdated targets
     &foreach_rules(sub {
 	shift;
 	foreach (@_) {
-	    if (!(defined $mtime{$_}) && -f) {
-		$mtime{$_} = (stat _)[9];
+	    unless (defined $mtime{$_}) {
+		if (-f) {
+		    $mtime{$_} = (stat _)[9];
+		} else {
+		    $mtime{$_} = ''; # No such file
+		}
 	    }
 	}
     });
 }
 
-# Call build function for all that need rebuild
+# Call build function for all to rebuild
 &foreach_rules(sub {
     my ($build, $target, @deps) = @_;
     my @build = @{$build};
-    if  ($targets{$target} || ! -f $target) {
-	#print "Target $target does not exist\n";
+    if ($targets{$target}) {
+	#print "Target $target forced\n";
 	&build(@build);
 	return;
     }
     my $target_mtime = $mtime{$target};
-    foreach my $d (@deps) {
-	-f $d or die "Missing dependency: $d";
-	if ($mtime{$d} >= $target_mtime) {
-	    #print "Target $target outdated vs $d\n";
+    unless ($target_mtime) {
+	#print "Target $target does not exist\n";
+	&build(@build);
+	return;
+    }
+    foreach (@deps) {
+	$mtime{$_} or die "Missing dependency: $_";
+	if ($mtime{$_} >= $target_mtime) {
+	    #print "Target $target outdated vs $_\n";
 	    &build(@build);
 	    return;
 	}
@@ -112,58 +123,64 @@ exit 0;
 
 
 
-# Toplevel build, wait for last pid in pipe
+# Toplevel per rule build, wait for last pid
 sub build {
-    my $func = shift;
-    open SAVEOUT, ">&STDOUT" or die "Can't dup STDOUT: $!";
-    my $last_pid = &{$func};
+    ##print "build <@_>\n";
+    open SAVEOUT, ">&STDOUT" or die "Can't save STDOUT: $!";
+    my $last_pid = &recurse;
     close STDOUT;
     waitpid $last_pid, 0;
-    open STDOUT, ">&SAVEOUT" or die "Can't dup SAVEOUT: $!";
+    open STDOUT, ">&SAVEOUT" or die "Can't restore STDOUT: $!";
 }
 
-# Make a pipe of the arguments to the next subroutine
+# Pipe command to the next
 sub pipe {
-    my @call;
-    my $func;
-    while (@_) {
-        my $x = shift;
-        if (ref $x) {
-	    # next subroutine found
-            $func = $x;
-            last;
-        } else {
-            push @call, $x;
-        }
+    ##print "pipe <@_>\n";
+    my @cmd = @{+shift};
+    print "@cmd | ";
+    my $call_pid = &recurse;
+    unless (my $pid = open STDOUT, '|-') {
+        defined $pid or die "Can't fork: $!";
+        exec {$cmd[0]} @cmd or die "Can't exec @cmd: $!";
     }
-    print "@call | ";
-    my $last_pid;
-    if (defined $func) {
-	print "@call | ";
-	$last_pid = &{$func};
-    } else {
-	print "@call\n";
-    }
+    return $call_pid;
+}
+
+# Redirect command to destination file.
+# Next item is a filename, not command.
+sub redirect {
+    ##print "redirect <@_>\n";
+    my @cmd = @{+shift};
+    my $dst = shift;
+    print "@cmd > $dst\n";
     my $pid;
     unless ($pid = open STDOUT, '|-') {
-        defined $pid or die "can't fork: $!";
-        exec {$call[0]} @call or die "can't exec @call: $!";
+        defined $pid or die "Can't fork: $!";
+        open STDOUT, ">$dst" or die "Can't open > $dst: $!";
+        exec {$cmd[0]} @cmd or die "Can't exec @cmd: $!";
     }
-    return $last_pid if defined $last_pid;
     return $pid;
 }
 
-# Redirect command to destination file
-sub redirect {
-    my $dst = shift;
-    print "@_ > $dst\n";
-    my $pid;
-    unless ($pid = open STDOUT, '|-') {
-        defined $pid or die "can't fork: $!";
-        open STDOUT, ">$dst" or die "can't open > $dst: $!";
-        exec {$_[0]} @_ or die "can't exec @_: $!";
+# Recursion helper, arguments are all remaining commands
+# Call next command with its arguments as first parameter
+# and remaing commands as the rest of the parameters.
+# 
+# &recurse(1, 2, 3, \&call, @commands) ->
+#     return &call([1, 2, 3], @commands)
+#
+sub recurse {
+    ##print "recurse <@_>\n";
+    my @call;
+    while (@_) {
+	$_ = shift @_;
+	if ((ref $_) eq 'CODE') {
+	    unshift @_, \@call;
+	    return &{$_};
+	}
+	push @call, $_;
     }
-    return $pid;
+    die "Build spec error - no next command";
 }
 
 # Helper loop subroutine over %rules
@@ -181,7 +198,7 @@ sub dir_files {
     my @names;
     opendir D, $dir || die "Can't opendir $dir: $!";
     while ($_ = readdir(D)) {
-	push @names, $dir.$_ if &{$subst};
+	push @names, $dir.$_ if &{$subst}();
     }
     closedir D;
     return @names;
