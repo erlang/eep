@@ -14,6 +14,10 @@ Type `perl build.pl` or `./build.pl` depending on your environment to
 rebuild all HTML that needs to be rebuilt. A reasonable 'perl' (5.8) is all
 that is needed.
 
+Patch suggestions to this repository should be sent to <eeps@erlang.org>
+(remember to subscribe to the list first) as stated in the
+[Erlang Enhancement Process][EEP].
+
 
 
 [MD]: http://daringfireball.net/projects/markdown/
@@ -22,7 +26,7 @@ that is needed.
 [Markdown.pl]: md/Markdown.pl
     "Markdown.pl"
 
-[EEP]: http://demo.erlang.org/static/dev/eep.html
+[EEP]: http://demo.erlang.org/eep.html
     "Erlang Enhancement Process"
 
 [build.pl]: build.pl
