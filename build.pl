@@ -25,6 +25,8 @@ my $src_ext = '.md';
 my $dst_ext = '.html';
 my @basenames =
     &dir_files($eeps_dir, sub {s/^(eep-\d+)$src_ext$/$1/});
+my @sources = @basenames;
+foreach (@sources) { $_ .= $src_ext }
 my $ix_base = $eeps_dir.'eep-0000';
 
 my %rules =
@@ -38,7 +40,7 @@ my %rules =
      [[@perl, $utf8, $ix, $ix_base.$src_ext, \&pipe,
        @perl, $utf8, $pre, \&pipe,
        @perl, $md, \&redirect, $ix_base.$dst_ext],
-      $ix_base.$src_ext, $mk, $ix, $pre, $md],
+      @sources, $mk, $ix, $pre, $md],
      );
 # Add rules for wildcard targets
 foreach (@basenames) {
