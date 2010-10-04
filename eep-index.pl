@@ -138,7 +138,7 @@ sub set_author {
     my $author;
     my $email = '';
     my @authors = split m|(?<=\S) \s* , \s* (?=\S)|x;
-    if ($authors[$#authors] =~ m|^ (.*?) \s* (\< .* \>) \s* $|x) {
+    if ($authors[0] =~ m|^ (.*?) \s* (\< .* \>) \s* $|x) {
 	($author, $email) = ($1, $2);
 	if ($email =~ m| (?<!\\) \`\` |x) {
 	    push
@@ -147,7 +147,7 @@ sub set_author {
 	}
 	$email = "\`\` $email \`\`";
     } else {
-	$author = $authors[$#authors];
+	$author = $authors[0];
     }
     $owner{$file} = $author;
     if (defined $author{$author}) {
