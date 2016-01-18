@@ -26,7 +26,7 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 [Markdown.pl]: md/Markdown.pl
     "Markdown.pl"
 
-[EEP]: http://demo.erlang.org/eep.html
+[EEP]: http://www.erlang.org/eep.html
     "Erlang Enhancement Process"
 
 [build.pl]: build.pl
