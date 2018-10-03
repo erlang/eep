@@ -2,17 +2,20 @@ Erlang Enhancement Process
 --------------------------
 
 This repository contains in the subdirectory eeps/ the EEPs (Erlang
-Extension Proposals), in [Markdown][MD] (*.md) format produced in the
+Extension Proposals), in [Markdown][MD] (`\*.md`) format produced in the
 [Erlang Enhancement Process][EEP].
 
-It also contains a version of a [Markdown.pl][] script in subdirectory
-md/ that can be used, for example with the also contained Perl [build
-script][build.pl] and some helper scripts, to produce HTML versions of
-the *.md EEPs.
+[EEP 0][], the EEP Index gathers all EEPS and is built with the tools
+in the following paragraphs.
+
+This repository also contains a version of a [Markdown.pl][] script in
+subdirectory `md/` that can be used, for example with the also contained
+Perl [build script][build.pl] and some helper scripts,
+to produce HTML versions of the `\*.md` EEPs.
 
 Type `perl build.pl` or `./build.pl` depending on your environment to
-rebuild all HTML that needs to be rebuilt. A reasonable 'perl' (5.8) is all
-that is needed.
+rebuild all HTML that needs to be rebuilt. A reasonable `perl` (5.8)
+is all that is needed.
 
 Patch suggestions to this repository should be sent to <eeps@erlang.org>
 (remember to subscribe to the list first) as stated in the
@@ -32,6 +35,8 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 [build.pl]: build.pl
     "Perl build script to overcome Makefile inportability"
 
+[EEP 0]: http://erlang.org/eep/eeps/eep-0000.html
+    "EEP 0: Index of EEPS"
 
 
 Copyright
