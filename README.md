@@ -5,8 +5,8 @@ This repository contains in the subdirectory eeps/ the EEPs (Erlang
 Extension Proposals), in [Markdown][MD] (`*.md`) format produced in the
 [Erlang Enhancement Process][EEP].
 
-[EEP 0][], the EEP Index gathers all EEPs and is built with the tools
-in the following paragraphs.
+The [EEP Index][EEP 0] in [EEP 0][] gathers all EEPs and is built with
+the tools in the following paragraphs from the EEPs themselves.
 
 This repository also contains a version of a [Markdown.pl][] script in
 subdirectory `md/` that can be used, for example with the also contained
@@ -45,7 +45,7 @@ Copyright
 This document has been placed in the public domain.
 
 ### Author
-Erlang/OTP, Raimo Niskanen, 2010
+Erlang/OTP, Raimo Niskanen, 2010, 2018
 
 
 
