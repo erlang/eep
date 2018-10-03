@@ -5,7 +5,7 @@ This repository contains in the subdirectory eeps/ the EEPs (Erlang
 Extension Proposals), in [Markdown][MD] (`\*.md`) format produced in the
 [Erlang Enhancement Process][EEP].
 
-[EEP 0][], the EEP Index gathers all EEPS and is built with the tools
+[EEP 0][], the EEP Index gathers all EEPs and is built with the tools
 in the following paragraphs.
 
 This repository also contains a version of a [Markdown.pl][] script in
