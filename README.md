@@ -42,7 +42,8 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 Copyright
 ---------
 
-This document has been placed in the public domain.
+This document is placed in the public domain or under the CC0-1.0-Universal
+license, whichever is more permissive.
 
 ### Author
 Erlang/OTP, Raimo Niskanen, 2010, 2018
