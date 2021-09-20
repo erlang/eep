@@ -166,7 +166,7 @@ sub redirect {
 
 # Recursion helper, arguments are all remaining commands
 # Call next command with its arguments as first parameter
-# and remaing commands as the rest of the parameters.
+# and remaining commands as the rest of the parameters.
 # 
 # &recurse(1, 2, 3, \&call, @commands) ->
 #     return &call([1, 2, 3], @commands)
