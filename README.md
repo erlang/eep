@@ -1,5 +1,5 @@
 Erlang Enhancement Process
---------------------------
+==========================
 
 This repository contains in the subdirectory eeps/ the EEPs (Erlang
 Extension Proposals), in [Markdown][MD] (`*.md`) format produced in the
@@ -21,8 +21,6 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 (remember to subscribe to the list first) as stated in the
 [Erlang Enhancement Process][EEP].
 
-
-
 [MD]: http://daringfireball.net/projects/markdown/
     "The Markdown Project"
 
@@ -38,7 +36,6 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 [EEP 0]: http://erlang.org/eep/eeps/eep-0000.html
     "EEP 0: Index of EEPS"
 
-
 Copyright
 ---------
 
@@ -46,9 +43,8 @@ This document is placed in the public domain or under the CC0-1.0-Universal
 license, whichever is more permissive.
 
 ### Author
+
 Erlang/OTP, Raimo Niskanen, 2010, 2018
-
-
 
 [EmacsVar]: <> "Local Variables:"
 [EmacsVar]: <> "mode: indented-text"
