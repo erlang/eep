@@ -33,7 +33,7 @@ Patch suggestions to this repository should be sent to <eeps@erlang.org>
 [build.pl]: build.pl
     "Perl build script to overcome Makefile inportability"
 
-[EEP 0]: http://erlang.org/eep/eeps/eep-0000.html
+[EEP 0]: http://erlang.org/eeps/eep-0000
     "EEP 0: Index of EEPS"
 
 Copyright
