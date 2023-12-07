@@ -3,8 +3,6 @@ name: action
 
 on:
   push:
-    branches:
-      - master
   pull_request:
     branches:
       - master
@@ -15,10 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: docker://avtodev/markdown-lint:v1
+      - uses: DavidAnson/markdownlint-cli2-action@v14
         with:
-          config: 'markdownlint.config'
-          args: 'eeps/*.md README.md'
+          config: 'eep.markdownlint.json'
+          globs: |
+            README.md
+            eeps/*.md
       - name: Deploy on erlang.org
         if: github.ref == 'refs/heads/master'
         env:
