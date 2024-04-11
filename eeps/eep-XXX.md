@@ -159,7 +159,7 @@ nominal types in Dialyzer.
 New Features
 ------
 
-- Now, doing pattern-matching on opaques will raise a warning without 
+- Now, doing pattern-matching on opaques will raise a warning without
 stopping Dialyzer's analysis. (Previously, doing pattern-matching on opaques
 raised an error and caused Dialyzer to stop the analysis, and so Dialyzer
 could not catch other errors.)
@@ -181,13 +181,15 @@ for opaques as for nominals.
 
 Reference Implementation
 ========================
+
 Current implementation: <https://github.com/lucioleKi/otp/tree/cleanup>
 
 Backward compatibility
 ========================
+
 Code that contains no opaque type or does not use Dialyzer has no  change.
 
-Code that contains opaque type(s) and uses Dialyzer may experience changes 
+Code that contains opaque type(s) and uses Dialyzer may experience changes
 mentioned above.
 
 [1]: https://flow.org/en/docs/lang/nominal-structural/#in-flow
