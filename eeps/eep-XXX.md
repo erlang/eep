@@ -30,18 +30,18 @@ checking and inference, they are all structural type systems.  Two types
 are seen as equivalent if their structures are the same.  Type comparison
 are based on the structures of the types, not on how the user explicitly
 defines them.  For example, in the following example, `meter()` and
-`feet()` are equivalent in a structural type system, because they have
+`foot()` are equivalent in a structural type system, because they have
 the same structure.  The two types can be used interchangeably.  Neither
 of them differ from the basic type `integer()`.
 
     -type meter() :: integer().
-    -type feet() :: integer().
+    -type foot() :: integer().
 
 Nominal typing is an alternative type system, where two types are equivalent
 if and only if they are declared with the same type name.  If the example
-above is in a nominal type system, `meter()` and `feet()` are no longer
+above is in a nominal type system, `meter()` and `foot()` are no longer
 compatible because they have different names.  Whenever a function expects
-type `meter()`, passing in type `feet()` would result in an error.  Nominal
+type `meter()`, passing in type `foot()` would result in an error.  Nominal
 typing can prevent accidental misuse of types with the same structure.  It
 is a useful feature orthogonal to all the existing type systems for Erlang.
 
@@ -61,15 +61,15 @@ can be used as in the following example:
 
     % Declaration of nominal types
     -nominal meter() :: integer().
-    -nominal feet() :: integer().
+    -nominal foot() :: integer().
 
     % Constructor for nominal types
     -spec meter_ctor(integer()) -> meter().
     meter_ctor(X) -> X.
 
     % Function that has its input and/or output as nominal types
-    -spec meter_to_feet(meter()) -> feet().
-    meter_to_feet(X) -> X * 3.
+    -spec meter_to_foot(meter()) -> foot().
+    meter_to_foot(X) -> X * 3.
 
 Nominal types are declared and used in the same way as other user-defined
 types.  The compiler recognizes the syntax, but does not perform extra
@@ -79,10 +79,10 @@ According to nominal type-checking rules, if two nominal types have different
 names, and one is not nested in the other, then they are not compatible.  
 For instance, if we continue from the example above:
 
-    -spec foo() -> feet().
+    -spec foo() -> foot().
     foo() -> meter_ctor(24). 
     % Output type: meter(). 
-    % Expected type: feet().
+    % Expected type: foot().
     % Result: Dialyzer error.
 
 Dialyzer returns the following error for the function `foo()`:
@@ -92,17 +92,17 @@ Dialyzer returns the following error for the function `foo()`:
           () ->
              nominal({'example', 'meter', 0, 'transparent'}, integer())
     But the spec is example:foo
-          () -> feet()
+          () -> foot()
      The return types do not overlap
 On the other hand, nominal type-checking does not force the user to wrap or
 annotate values as nominal types. In the following example, Dialyzer does
-not return any error for the function `bar()`. The spec for `meter_to_feet()`
+not return any error for the function `bar()`. The spec for `meter_to_foot()`
 expects a `meter()` type as input.  Passing in a `integer()` type is allowed,
 because `meter()` is defined to have type `integer()`.  Only if the input
 is of a different basic type, for example `atom()`, Dialyzer will reject it.
 
-    -spec bar() -> feet().
-    bar() -> meter_to_feet(24). 
+    -spec bar() -> foot().
+    bar() -> meter_to_foot(24). 
     % Input type: integer(). 
     % Expected type: meter().
     % Result: No error.
@@ -112,7 +112,7 @@ is also allowed.  In the following example, Dialyzer does not return any
 error for the function `qaz()`.  The spec for `meter_ctor()` expects a
 `integer()` type as input. Passing in a `meter()` type is allowed, because
 `meter()` is defined to have type `integer()`.  Similarly, passing in a
-type `feet()` is also allowed when `integer()` is expected.
+type `foot()` is also allowed when `integer()` is expected.
 
     -spec qaz() -> integer().
     qaz() -> meter_ctor(meter_ctor(24)). 
