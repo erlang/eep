@@ -143,7 +143,7 @@ For two nominal types `s()` and `t()`, `s()` is a **nominal subtype** of
 `t()`, and `t()` is a **nominal supertype** of `s()` if `t()` is nested
 in `s()`.
 
-- Cases where `s()` is a nominal subtype of `t()`: 
+- Cases where `s()` is a nominal subtype of `t()`:
     - `t()` can be directly nested in `s()`.
 
           -nominal s() :: t().
@@ -158,10 +158,11 @@ in `s()`.
     nesting cannot contain other types before reaching `t()`.
 
           -nominal s() :: t() | 'foo'.
+
 A non-nominal type is **compatible** with a nominal or non-nominal type
 if they share common values. Empirically, the function `erl_types:t_inf/2`
 can compute the intersection of 2 types. Two types that have a non-empty
-intersection are structurally compatible. 
+intersection are structurally compatible.
 
 - Examples:
     - 4711 and 42 are not structurally compatible.
@@ -171,13 +172,14 @@ intersection are structurally compatible.
     - `-nominal t() :: integer()` and 4711 are structurally compatible. (Their
     intersection is the value `t() :: 4711`.)
     - `-nominal t() :: non_neg_integer()` and `neg_integer()` are not
-    structurally compatible. 
----
+    structurally compatible.
+
+****
 The nominal type-checking rules proposed by this EEP can be summarized as
 follows:
 
 A function that has a `-spec` that states an argument or a return type to be
-nominal type `a/0` (or any other arity), accepts or may return: 
+nominal type `a/0` (or any other arity), accepts or may return:
 
 - Nominal type `a/0`
 - A nominal supertype or subtype of `a/0`
