@@ -165,14 +165,17 @@ can compute the intersection of 2 types. Two types that have a non-empty
 intersection are structurally compatible.
 
 - Examples:
-    - 4711 and 42 are not structurally compatible.
+    - 4711 and 42 are not structurally compatible. (No integer value can be
+    both 4711 and 42.)
     - 4711 and `integer()` are structurally compatible. (Their intersection
     is the value 4711.)
-    - `list(any_type)` and `[]` are structurally compatible.
+    - `list(any_type)` and `[]` are structurally compatible. (Their intersection
+    is `[]`.)
     - `-nominal t() :: integer()` and 4711 are structurally compatible. (Their
     intersection is the value `t() :: 4711`.)
     - `-nominal t() :: non_neg_integer()` and `neg_integer()` are not
-    structurally compatible.
+    structurally compatible. (No value belongs to both `non_neg_integer()` and
+    `neg_integer()`.)
 
 ****
 The nominal type-checking rules proposed by this EEP can be summarized as
