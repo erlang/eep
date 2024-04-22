@@ -133,6 +133,62 @@ can be safely used when a type `integer()` is expected.  Using `[state()]`
 as the second parameter of `record_container()`'s construction is allowed,
 even though `container()` and `state()` have different names.
 
+Nominal Type-Checking Rules
+----------------------------
+
+In order to specify nominal type-checking rules, there are three terms that
+need to be defined. The scope of these definitions are local to this EEP.
+
+For two nominal types `s()` and `t()`, `s()` is a **nominal subtype** of
+`t()`, and `t()` is a **nominal supertype** of `s()` if `t()` is nested
+in `s()`.
+
+- Cases where `s()` is a nominal subtype of `t()`: 
+    - `t()` can be directly nested in `s()`.
+
+          -nominal s() :: t().
+    - `t()` can be nested in other nominal type(s), which is then nested
+    in `s()`.
+
+          -nominal s() :: nominal_1().
+          -nominal nominal_1() :: nominal_2().
+          -nominal nominal_2() :: t().
+- One case where `s()` is *not* a nominal subtype of `t()`:
+    - `s()` is defined as a union type of `t()` and some other type. The
+    nesting cannot contain other types before reaching `t()`.
+
+          -nominal s() :: t() | 'foo'.
+A non-nominal type is **compatible** with a nominal or non-nominal type
+if they share common values. Empirically, the function `erl_types:t_inf/2`
+can compute the intersection of 2 types. Two types that have a non-empty
+intersection are structurally compatible. 
+
+- Examples:
+    - 4711 and 42 are not structurally compatible.
+    - 4711 and `integer()` are structurally compatible. (Their intersection
+    is the value 4711.)
+    - `list(any_type)` and `[]` are structurally compatible.
+    - `-nominal t() :: integer()` and 4711 are structurally compatible. (Their
+    intersection is the value `t() :: 4711`.)
+    - `-nominal t() :: non_neg_integer()` and `neg_integer()` are not
+    structurally compatible. 
+---
+The nominal type-checking rules proposed by this EEP can be summarized as
+follows:
+
+A function that has a `-spec` that states an argument or a return type to be
+nominal type `a/0` (or any other arity), accepts or may return: 
+
+- Nominal type `a/0`
+- A nominal supertype or subtype of `a/0`
+- A compatible structural type.
+
+A function that has a `-spec` that states an argument or a return type to be
+a structural type `b/0` (or any other arity), accepts or may return:
+
+- A compatible structural type.
+- A compatible nominal type.
+
 Optimizing Type-Checking for Opaques
 =======================================
 
