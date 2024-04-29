@@ -155,9 +155,11 @@ in `s()`.
           -nominal nominal_2() :: t().
 
 A non-nominal type is **compatible** with a nominal or non-nominal type
-if they share common values. Empirically, the function `erl_types:t_inf/2`
-can compute the intersection of 2 types. Two types that have a non-empty
-intersection are structurally compatible.
+if their structures are deemed compatible by the type-checker. 
+
+For Dialyzer, two types are compatible if they share common values. The
+function `erl_types:t_inf/2` computes the intersection of 2 types. Two
+types that have a non-empty intersection are structurally compatible.
 
 - Examples:
     - 4711 and 42 are not structurally compatible. (No integer value can be
@@ -188,6 +190,16 @@ a structural type `b/0` (or any other arity), accepts or may return:
 
 - A compatible structural type.
 - A compatible nominal type.
+
+A supertype is allowed when expecting a nominal subtype for the following 3
+reasons (even though subtyping relation is not symmetric):
+
+- To minimize the users' effort of converting values to nominal types or
+rewriting specifications.
+- Dialyzer (success typing) allows for it among structural types. Most
+existing type-checkers for Erlang allow for it as well.
+- To make nominal type-checking more flexible than restrictive.
+
 
 Optimizing Type-Checking for Opaques
 =======================================
