@@ -153,11 +153,6 @@ in `s()`.
           -nominal s() :: nominal_1().
           -nominal nominal_1() :: nominal_2().
           -nominal nominal_2() :: t().
-- One case where `s()` is *not* a nominal subtype of `t()`:
-    - `s()` is defined as a union type of `t()` and some other type. The
-    nesting cannot contain other types before reaching `t()`.
-
-          -nominal s() :: t() | 'foo'.
 
 A non-nominal type is **compatible** with a nominal or non-nominal type
 if they share common values. Empirically, the function `erl_types:t_inf/2`
@@ -245,13 +240,24 @@ Reference Implementation
 
 Current implementation: <https://github.com/lucioleKi/otp/tree/cleanup>
 
-Backward compatibility
+Backward Compatibility
 ========================
 
 Code that contains no opaque type or does not use Dialyzer has no  change.
 
 Code that contains opaque type(s) and uses Dialyzer may experience changes
 mentioned above.
+
+For Other Type-Checkers
+----------------------
+
+If other type-checkers do not implement nominal type-checking, they can
+treat `-nominal` in the same way as `-type`. 
+
+If other type-checkers choose to implement nominal type-checking, they
+should implement it in a way that is consistent with this EEP. The purpose
+is to ensure that nominal types keep the same semantic, and are type-checked
+in the same way across different type-checkers. 
 
 [1]: https://flow.org/en/docs/lang/nominal-structural/#in-flow
 
