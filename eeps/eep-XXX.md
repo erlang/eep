@@ -252,12 +252,12 @@ For Other Type-Checkers
 ----------------------
 
 If other type-checkers do not implement nominal type-checking, they can
-treat `-nominal` in the same way as `-type`. 
+treat `-nominal` in the same way as `-type`.
 
 If other type-checkers choose to implement nominal type-checking, they
 should implement it in a way that is consistent with this EEP. The purpose
 is to ensure that nominal types keep the same semantic, and are type-checked
-in the same way across different type-checkers. 
+in the same way across different type-checkers.
 
 [1]: https://flow.org/en/docs/lang/nominal-structural/#in-flow
 
