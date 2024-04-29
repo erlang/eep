@@ -155,7 +155,7 @@ in `s()`.
           -nominal nominal_2() :: t().
 
 A non-nominal type is **compatible** with a nominal or non-nominal type
-if their structures are deemed compatible by the type-checker. 
+if their structures are deemed compatible by the type-checker.
 
 For Dialyzer, two types are compatible if they share common values. The
 function `erl_types:t_inf/2` computes the intersection of 2 types. Two
@@ -199,7 +199,6 @@ rewriting specifications.
 - Dialyzer (success typing) allows for it among structural types. Most
 existing type-checkers for Erlang allow for it as well.
 - To make nominal type-checking more flexible than restrictive.
-
 
 Optimizing Type-Checking for Opaques
 =======================================
