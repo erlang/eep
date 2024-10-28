@@ -196,7 +196,7 @@ sub set_type {
 }
 
 # Mapping of EEP header tag to handler set_* function
-my %key =
+my %set =
     ('eep' => \&set_eep,
      'title' => \&set_title,
      'version' => 0,
@@ -216,12 +216,12 @@ my %key =
 
 sub store_key {
     my ($hash, $key, $value) = @_;
-    unless (defined $key{$key}) {
+    unless (defined $set{$key}) {
 	push 
 	    @warnings, 
 	    "File $file: '$key:' unknown header - file skipped!";
     }
-    if ($key{$key}) {
+    if ($set{$key} || $check{$key}) {
 	if (defined $$hash{$key}) {
 	    push 
 		@warnings, 
@@ -286,8 +286,8 @@ while ($file = readdir DIR) {
 	} elsif ($line =~ m|^\s*$|) { # blank line
 	    # end of headers - process them all
 	    next LINE unless defined($hdr{'eep'}); # still missing?
-	    foreach (keys %key) {
-		if ($key{$_} and !(defined $hdr{$_})) {
+	    foreach (keys %set) {
+		if ($set{$_} and !(defined $hdr{$_})) {
 		    push
 			@warnings,
 			"File $file: '$_:' missing header - file skipped!";
@@ -296,7 +296,7 @@ while ($file = readdir DIR) {
 	    }
 	    # call handler for all headers
 	    while (($key, $_) = each %hdr) {
-		&{$key{$key}};
+		&{$set{$key}} if $set{$key};
 	    }
 	    last LINE;
 	} else {
