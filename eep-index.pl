@@ -369,7 +369,7 @@ while (<INDEX>) {
 #
 if (@warnings) {
     print "${lf}${lf}${lf}----${lf}Warnings${lf}--------${lf}";
-    foreach (@warnings) {
+    foreach (sort @warnings) {
 	print "    $_";
     }
 }
