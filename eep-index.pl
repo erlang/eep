@@ -164,7 +164,7 @@ sub set_author {
 }
 
 sub set_status {
-    m|^ ([^/]*) (/? [^\s]*) \s* (.*)|x;
+    m|^ ([^/]*) (/? [^\s]*) \s* ([^;]*)|x;
     my ($status, $tag, $desc) = ($1, $2, $3);
     my $s = $status_map{lc $status};
     unless (defined $s) {
