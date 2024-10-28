@@ -43,7 +43,7 @@ my @status =
      'Draft' => '',
      'Accepted' => 'A',
      'Rejected' => 'R',
-     'Withdrawn' => 'W',
+     'Replaced' => 'P',
      'Deferred' => 'D',
      'Final' => 'F',
      );
