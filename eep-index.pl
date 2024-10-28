@@ -214,6 +214,35 @@ my %set =
      'replaced-by' => 0,
      );
 
+sub check_erlang_version {
+    my $version = $_;
+    if (defined($version)) {
+        push @warnings, "File $file: 'version: $version' illegal!"
+            unless $version =~ /OTP_R[0-9]+[AB]([-][0-9])?/ || $version =~ /OTP-([0-9]+)[.]/;
+    } elsif ($status{$file} =~ /^F\//) {
+        push @warnings, "File $file: 'version: EEPs in status Final must have an Erlang-Version!";
+    }
+}
+
+# Mapping of EEP header tag to handler check_* function
+my %check =
+    ('eep' => 0,
+     'title' => 0,
+     'version' => 0,
+     'last-modified' => 0,
+     'author' => 0,
+     'discussions-to' => 0,
+     'status' => 0,
+     'type' => 0,
+     'content-type' => 0,
+     'requires' => 0,
+     'created' => 0,
+     'erlang-version' => \&check_erlang_version,
+     'post-history' => 0,
+     'replaces' => 0,
+     'replaced-by' => 0,
+     );
+
 sub store_key {
     my ($hash, $key, $value) = @_;
     unless (defined $set{$key}) {
@@ -298,6 +327,12 @@ while ($file = readdir DIR) {
 	    while (($key, $_) = each %hdr) {
 		&{$set{$key}} if $set{$key};
 	    }
+
+            # call checks for all headers
+	    while (($key, $_) = each %hdr) {
+		&{$check{$key}} if $check{$key};
+	    }
+
 	    last LINE;
 	} else {
 	    push
