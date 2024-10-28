@@ -12,13 +12,20 @@ jobs:
     name: markdownlint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: DavidAnson/markdownlint-cli2-action@v14
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v17
         with:
           config: 'eep.markdownlint.json'
           globs: |
             README.md
             eeps/*.md
+      - name: Build html using Gruber MD
+        run: |
+            ./build.pl
+            ## Check for warnings by build.pl
+            if grep '<h2>Warnings</h2>' > /dev/null; then
+                exit 1
+            fi
       - name: Deploy on erlang.org
         if: github.ref == 'refs/heads/master'
         env:
