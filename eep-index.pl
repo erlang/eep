@@ -43,7 +43,7 @@ my @status =
      'Draft' => '',
      'Accepted' => 'A',
      'Rejected' => 'R',
-     'Withdrawn' => 'W',
+     'Replaced' => 'P',
      'Deferred' => 'D',
      'Final' => 'F',
      );
@@ -164,7 +164,7 @@ sub set_author {
 }
 
 sub set_status {
-    m|^ ([^/]*) (/? [^\s]*) \s* (.*)|x;
+    m|^ ([^/]*) (/? [^\s]*) \s* ([^;]*)|x;
     my ($status, $tag, $desc) = ($1, $2, $3);
     my $s = $status_map{lc $status};
     unless (defined $s) {
@@ -196,7 +196,7 @@ sub set_type {
 }
 
 # Mapping of EEP header tag to handler set_* function
-my %key =
+my %set =
     ('eep' => \&set_eep,
      'title' => \&set_title,
      'version' => 0,
@@ -214,14 +214,43 @@ my %key =
      'replaced-by' => 0,
      );
 
+sub check_erlang_version {
+    my $version = $_;
+    if (defined($version)) {
+        push @warnings, "File $file: 'version: $version' illegal!"
+            unless $version =~ /OTP_R[0-9]+[AB]([-][0-9])?/ || $version =~ /OTP-([0-9]+)[.]/;
+    } elsif ($status{$file} =~ /^F\//) {
+        push @warnings, "File $file: 'version: EEPs in status Final must have an Erlang-Version!";
+    }
+}
+
+# Mapping of EEP header tag to handler check_* function
+my %check =
+    ('eep' => 0,
+     'title' => 0,
+     'version' => 0,
+     'last-modified' => 0,
+     'author' => 0,
+     'discussions-to' => 0,
+     'status' => 0,
+     'type' => 0,
+     'content-type' => 0,
+     'requires' => 0,
+     'created' => 0,
+     'erlang-version' => \&check_erlang_version,
+     'post-history' => 0,
+     'replaces' => 0,
+     'replaced-by' => 0,
+     );
+
 sub store_key {
     my ($hash, $key, $value) = @_;
-    unless (defined $key{$key}) {
+    unless (defined $set{$key}) {
 	push 
 	    @warnings, 
 	    "File $file: '$key:' unknown header - file skipped!";
     }
-    if ($key{$key}) {
+    if ($set{$key} || $check{$key}) {
 	if (defined $$hash{$key}) {
 	    push 
 		@warnings, 
@@ -286,8 +315,8 @@ while ($file = readdir DIR) {
 	} elsif ($line =~ m|^\s*$|) { # blank line
 	    # end of headers - process them all
 	    next LINE unless defined($hdr{'eep'}); # still missing?
-	    foreach (keys %key) {
-		if ($key{$_} and !(defined $hdr{$_})) {
+	    foreach (keys %set) {
+		if ($set{$_} and !(defined $hdr{$_})) {
 		    push
 			@warnings,
 			"File $file: '$_:' missing header - file skipped!";
@@ -296,8 +325,14 @@ while ($file = readdir DIR) {
 	    }
 	    # call handler for all headers
 	    while (($key, $_) = each %hdr) {
-		&{$key{$key}};
+		&{$set{$key}} if $set{$key};
 	    }
+
+            # call checks for all headers
+	    while (($key, $_) = each %hdr) {
+		&{$check{$key}} if $check{$key};
+	    }
+
 	    last LINE;
 	} else {
 	    push
@@ -369,7 +404,7 @@ while (<INDEX>) {
 #
 if (@warnings) {
     print "${lf}${lf}${lf}----${lf}Warnings${lf}--------${lf}";
-    foreach (@warnings) {
+    foreach (sort @warnings) {
 	print "    $_";
     }
 }
