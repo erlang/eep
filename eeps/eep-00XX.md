@@ -182,7 +182,8 @@ handled by MFArgs.
 With that in mind, some alternatives were explored, which we mention
 below.
 
-### `{Fun, Args}` Pairs
+`{Fun, Args}` Pairs
+-------------------
 
 One alternative is to support `{fun some_mod:some_fun/3, [Arg1, Arg2]}`.
 This does improve a few things, as it makes the arity clear and "go to
@@ -192,7 +193,8 @@ as they need to support both regular functions and `{Fun, Args}` pairs.
 `{Fun, Args}` would likely allow us to type check the return type, but
 the argument types could only be partially validated.
 
-### Additional Data Types
+Additional Data Types
+---------------------
 
 Additional data types could also be introduced, for example, a
 "serializable function" record which would be internally represented as
