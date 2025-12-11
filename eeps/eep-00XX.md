@@ -210,7 +210,7 @@ In case this is deemed a restriction, different options could be
 considered:
 
 * Require all partially applied functions to have at least one `_`,
-  forbidding `fun foo(X)` or `fun some_mod:some_fun(Args)`. This does 
+  forbidding `fun foo(X)` or `fun some_mod:some_fun(Args)`. This does
   add a syntactical annoyance but it does not remove any capability
   as any function without placeholder can be written as a zero-arity
   function;
@@ -284,7 +284,7 @@ maps:get(username, _)
 The lack of a prefix makes it harder to spot when a function is created
 and also leads to visual ambiguity, such as in the code below:
 
-```erlang    
+```erlang
 list_to_binary([1, 2, math:pow(2, _)])
 ```
 
