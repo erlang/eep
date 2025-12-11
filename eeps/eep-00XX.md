@@ -61,10 +61,11 @@ Despite their wide spread use, MFArgs come with several downsides:
 4. They cause duplication in APIs, as APIs need to accept both `Fun`
    and `MFArgs` as arguments;
 
-5. As we attempt to statically type programs, MFArgs cannot fully
-   statically check its arguments nor the return type. Consequently,
-   errors which could be caught statically, must now be handled
-   exclusively at runtime;
+5. As we attempt to statically type Erlang programs, MFArgs offer
+   limited opportunities for static verification, which either
+   becomes the source of dynamism (so errors that could be caught
+   statically must now be handled at runtime) or leads to false
+   positives (requiring developers to rewrite their code);
 
 Solution
 ========
@@ -135,11 +136,19 @@ fun Mod:Fun(...Args)
 ```
 
 Where `Args` can be zero, one, or many arguments. Arguments
-must be either literals or variables. The `_` variable denotes
-placeholders, which are arguments that have not yet been
-provided (the use of `_` is a proposal, the exact notation can
-be changed). The number of placeholders dictate the arity of the
-function and they are provided in order. For example:
+must be either literals or bound variables. We have seen
+literal examples above, but the arguments may also be variables:
+
+```erlang
+Key = get_key().
+Fun = fun maps:get(Key, _).
+```
+
+The `_` variable denotes placeholders, which are arguments
+that have not yet been provided (the use of `_` is a proposal,
+the exact notation can be changed). The number of placeholders
+dictate the arity of the function and they are provided in order.
+For example:
 
 ```erlang
 fun hello(_, world, _)
@@ -152,7 +161,7 @@ fun(X, Y) -> hello(X, world, Y) end
 ```
 
 Note Erlang will guarantee the applied arguments are either literals
-or variables, ensuring the functions are indeed persistent across
+or bound variables, ensuring the functions are indeed persistent across
 nodes/modules. This is important because the role of this feature goes
 beyond syntax sugar: it allows Erlang developers to glance at the code
 and, as long as it uses `fun Mod:Fun/Arity` or `fun Mod:Fun(...Args)`,
@@ -160,12 +169,62 @@ they know they can be persisted. This information could also be used
 by static analyzers and other features to lint code around distribution
 properties.
 
-Note it should also be possible to apply all arguments, meaning a
-zero-arity function is returned:
+It should also be possible to partially apply a module/function pair
+given by bound variables:
+
+```erlang
+fun Mod:Fun(username, _)
+```
+
+However, it is not possible to partially apply an unknown local function
+(mirror the fact that `fun Fun/0` is not valid today):
+
+```erlang
+fun Fun(username, _) % will fail to compile
+```
+
+It is also possible to apply all arguments, meaning a zero-arity function
+is returned:
 
 ```erlang
 fun Mod:Fun(arg1, arg2, arg3)
 ```
+
+Visual cluttering
+-----------------
+
+Given Erlang also supports named functions, the differences
+between named functions, partially applied, and regular
+`Function/Arity` may be too small:
+
+```erlang
+foo(Y) -> Y-1.
+bar(X) ->
+    F1 = fun Foo(X) -> X+1 end, % Arity 1
+    F2 = fun foo(X),            % Arity 0
+    F3 = fun foo/1,             % Arity 1
+    {F1(X), F2(), F3(X)}.
+```
+
+In case this is deemed a restriction, different options could be
+considered:
+
+* Require all partially applied functions to have at least one `_`,
+  forbidding `fun foo(X)` or `fun some_mod:some_fun(Args)`. This does 
+  add a syntactical annoyance but it does not remove any capability
+  as any function without placeholder can be written as a zero-arity
+  function;
+  
+* Only allow remote partially applied functions, so `fun foo(_, ok)`
+  is invalid, but `fun some_mod:foo(_, ok)` is accepted. Unfortunately,
+  this may lead to developers doing external calls when a local call
+  would suffice;
+
+* Require partially applied functions to explicit list the arity too,
+  hence `fun foo(X)` has to be written as: `fun foo(X)/0`.
+  `fun maps:get(username, _)` as `fun maps:get(username, _)/1`.
+  If the version with arity is preferred, then the `fun` prefix could
+  also be dropped, if desired, as there is no ambiguity;
 
 Alternative Solutions
 =====================
@@ -179,8 +238,7 @@ which are limited in terms of code execution. This means an API that
 worked exclusively at runtime would not tackle all of the use cases
 handled by MFArgs.
 
-With that in mind, some alternatives were explored, which we mention
-below.
+With that in mind, we discuss some alternatives below.
 
 `{Fun, Args}` Pairs
 -------------------
@@ -209,6 +267,39 @@ support this additional data type but, if we are ultimately changing
 the Erlang runtime, I'd argue it is simpler and more productive to add
 the serialization properties to functions, as done in this proposal,
 than adding a new construct.
+
+Cuts from erlando
+-----------------
+
+The [`erlando`](https://github.com/rabbitmq/erlando) project offered
+the ability to partially apply functions (and also data structures).
+
+In particular, `erlando` does not require the `fun` prefix, so one can
+write:
+
+```erlang
+maps:get(username, _)
+```
+
+The lack of a prefix makes it harder to spot when a function is created
+and also leads to visual ambiguity, such as in the code below:
+
+```erlang    
+list_to_binary([1, 2, math:pow(2, _)])
+```
+
+Their documentation clarifies that it is always shallow (hence it applies
+to `math:pow/2`).
+
+`erlando` also allows expressions of arbitrary complexity as argument:
+
+```erlang
+maps:get(get_key_from(lists:flatten(Arg)), _)
+```
+
+This is intentionally disallowed in this proposal because one of the primary
+goals of this proposal is to offer a clear syntactical affordance for functions
+that are persistent across nodes.
 
 Copyright
 =========
