@@ -160,9 +160,11 @@ spawn(fun ?MODULE:server_loop(self(), #{}))
 is equivalent to:
 
 ```erlang
-Arg1 = self(),
-Arg2 = #{},
-spawn(fun() -> ?MODULE:server_loop(Arg1, Arg2) end).
+spawn(begin
+  Arg1 = self(),
+  Arg2 = #{},
+  fun() -> ?MODULE:server_loop(Arg1, Arg2) end
+end).
 ```
 
 This is important because the role of this feature goes beyond syntax
@@ -172,8 +174,8 @@ they know they can be persisted. This information could also be used by
 static analyzers and other features to lint code around distribution
 properties.
 
-Bound variables
----------------
+Bound variables as functions
+----------------------------
 
 It is also possible to partially apply a module/function pair
 given by bound variables:
