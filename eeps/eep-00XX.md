@@ -30,11 +30,11 @@ apply(Mod, Fun, [SomeValue | Args]).
 ```
 
 One of the main reasons MFArgs exist is because anonymous functions
-which close over an existing environment cannot be serialized across
-nodes nor be persisted to disk, so when dealing with distribution,
-disk persistence, or hot code upgrades, you must carefully stick with
-MFArgs. Similarly, configuration files do not support anonymous
-functions, and MFArgs are the main option.
+which close over an existing environment can only be serialized across
+nodes nor be persisted to disk if they preserve the same module version.
+Therefore, when dealing with distribution, disk persistence, or hot code
+upgrades, it is preferrable to use MFArgs instead. Similarly, configuration
+files do not support anonymous functions, and MFArgs are the main option.
 
 Due to those limitations, many functions in Erlang/OTP and also in
 libraries need to provide two APIs, one that accepts function types
@@ -81,17 +81,11 @@ let's see an example:
     2> Fun(#{username => "Joe"}).
     "Joe"
 
-The above is equivalent to:
-
-    1> Fun = fun(X) -> maps:get(username, X) end.
-    2> Fun(#{username => "Joe"}).
-    "Joe"
-
 While the proposed notation does provide syntactical affordances,
 the most important aspect is that the function preserves its remote
 name and arguments within the runtime. This means the partially
 applied function can be passed across nodes or written to disk,
-even if the module that defines the function is gone.
+even if the module that defines the function changes versions.
 
 Furthermore, partially applied functions can replace `MFArgs`,
 removing all ambiguity about its behaviour. For example, imagine
@@ -131,64 +125,75 @@ Syntax Specification
 The syntax of partially applied functions will be:
 
 ```erlang
-fun Fun(...Args)
-fun Mod:Fun(...Args)
+fun some_fun(...Args)
+fun some_mod:some_fun(...Args)
 ```
 
-Where `Args` can be zero, one, or many arguments. Arguments
-must be either literals or bound variables. We have seen
-literal examples above, but the arguments may also be variables:
+Where `Args` can be zero, one, or many arguments. Arguments can
+be any expression or the `_` variable. The `_` variable denotes
+placeholders, which are arguments that have not yet been provided
+(the use of `_` is a proposal, the exact notation can be changed).
+A partially applied function may have zero or more placeholders.
+The number of placeholders dictate the arity of the function and
+they are provided in order. For example, this is a two arity
+function:
 
 ```erlang
-Key = get_key().
-Fun = fun maps:get(Key, _).
-```
-
-The `_` variable denotes placeholders, which are arguments
-that have not yet been provided (the use of `_` is a proposal,
-the exact notation can be changed). The number of placeholders
-dictate the arity of the function and they are provided in order.
-For example:
-
-```erlang
+%% two arity function
 fun hello(_, world, _)
+```
+
+The placeholder must always appear in the position of an argument,
+it cannot be nested inside construct. The following is not allowed:
+
+```erlang
+fun hello({_, world}, _)
+```
+
+Furthermore, all arguments that are not placeholders are evaluted
+**before** the function. Therefore, the following call:
+
+```erlang
+spawn(fun ?MODULE:server_loop(self(), #{}))
 ```
 
 is equivalent to:
 
 ```erlang
-fun(X, Y) -> hello(X, world, Y) end
+Arg1 = self(),
+Arg2 = #{},
+spawn(fun() -> ?MODULE:server_loop(Arg1, Arg2) end).
 ```
 
-Note Erlang will guarantee the applied arguments are either literals
-or bound variables, ensuring the functions are indeed persistent across
-nodes/modules. This is important because the role of this feature goes
-beyond syntax sugar: it allows Erlang developers to glance at the code
-and, as long as it uses `fun Mod:Fun/Arity` or `fun Mod:Fun(...Args)`,
-they know they can be persisted. This information could also be used
-by static analyzers and other features to lint code around distribution
+This is important because the role of this feature goes beyond syntax
+sugar: it allows Erlang developers to glance at the code and, as long
+as it uses `fun some_mod:some_fun/Arity` or `fun some_mod:some_fun(...Args)`,
+they know they can be persisted. This information could also be used by
+static analyzers and other features to lint code around distribution
 properties.
 
-It should also be possible to partially apply a module/function pair
+Bound variables
+---------------
+
+It is also possible to partially apply a module/function pair
 given by bound variables:
 
 ```erlang
 fun Mod:Fun(username, _)
 ```
 
-However, it is not possible to partially apply an unknown local function
-(mirror the fact that `fun Fun/0` is not valid today):
+It is also possible to partially apply another function:
 
 ```erlang
-fun Fun(username, _) % will fail to compile
+GetUsername = fun maps:get(username, _),
+fun GetUsername(SomeMap).
 ```
 
-It is also possible to apply all arguments, meaning a zero-arity function
-is returned:
+The code above returns a zero-arity function that returns the
+`username` of `SomeMap` when applied.
 
-```erlang
-fun Mod:Fun(arg1, arg2, arg3)
-```
+However, note that `fun SomeFun/0` is not valid today, and
+that syntax should still raise.
 
 Visual cluttering
 -----------------
@@ -291,15 +296,9 @@ list_to_binary([1, 2, math:pow(2, _)])
 Their documentation clarifies that it is always shallow (hence it applies
 to `math:pow/2`).
 
-`erlando` also allows expressions of arbitrary complexity as argument:
-
-```erlang
-maps:get(get_key_from(lists:flatten(Arg)), _)
-```
-
-This is intentionally disallowed in this proposal because one of the primary
-goals of this proposal is to offer a clear syntactical affordance for functions
-that are persistent across nodes.
+This proposal also specifies that all arguments must be evaluated before
+the function is captured, so the functions can be persisted across nodes.
+`erlando` does not implement such behaviour.
 
 Copyright
 =========
