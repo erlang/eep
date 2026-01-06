@@ -33,7 +33,7 @@ One of the main reasons MFArgs exist is because anonymous functions
 which close over an existing environment can only be serialized across
 nodes nor be persisted to disk if they preserve the same module version.
 Therefore, when dealing with distribution, disk persistence, or hot code
-upgrades, it is preferrable to use MFArgs instead. Similarly, configuration
+upgrades, it is essential to use MFArgs instead. Similarly, configuration
 files do not support anonymous functions, and MFArgs are the main option.
 
 Due to those limitations, many functions in Erlang/OTP and also in
@@ -70,7 +70,7 @@ Despite their wide spread use, MFArgs come with several downsides:
 Solution
 ========
 
-Erlang must provide a contruct for partially applied functions.
+Erlang should provide a construct for partially applied functions.
 Partially applied functions use the `fun Mod:Fun(...Args)` notation,
 where arguments can also be placeholders given by the `_` variable.
 
@@ -95,11 +95,11 @@ the configuration below:
 {some_config, {some_mod, some_fun, [answer, 42]}}.
 ```
 
-If `some_config` is invoked with an additional argument, such
-argument is not specified in the configuration definition itself,
+If `some_config` is invoked with additional arguments, those
+arguments are not specified in the configuration definition itself,
 therefore it is unclear which arity of `some_mod:some_fun` will
 be invoked. But with partially applied functions, the number of
-arguments is always clear, "go to definition" works, as config
+arguments is always clear, "go to definition" works, as do config
 files and static typing:
 
 ```erlang
@@ -144,13 +144,13 @@ fun hello(_, world, _)
 ```
 
 The placeholder must always appear in the position of an argument,
-it cannot be nested inside construct. The following is not allowed:
+it cannot be nested inside a construct. The following is not allowed:
 
 ```erlang
 fun hello({_, world}, _)
 ```
 
-Furthermore, all arguments that are not placeholders are evaluted
+Furthermore, all arguments that are not placeholders are evaluated
 **before** the function. Therefore, the following call:
 
 ```erlang
@@ -167,7 +167,7 @@ spawn(begin
 end).
 ```
 
-This is important because the role of this feature goes beyond syntax
+This is important because the role of this feature goes beyond syntactic
 sugar: it allows Erlang developers to glance at the code and, as long
 as it uses `fun some_mod:some_fun/Arity` or `fun some_mod:some_fun(...Args)`,
 they know they can be persisted. This information could also be used by
@@ -195,13 +195,13 @@ The code above returns a zero-arity function that returns the
 `username` of `SomeMap` when applied.
 
 However, note that `fun SomeFun/0` is not valid today, and
-that syntax should still raise.
+such syntax will remain invalid.
 
 Visual cluttering
 -----------------
 
 Given Erlang also supports named functions, the differences
-between named functions, partially applied, and regular
+between named functions, partially applied functions, and regular
 `Function/Arity` may be too small:
 
 ```erlang
@@ -227,7 +227,7 @@ considered:
   this may lead to developers doing external calls when a local call
   would suffice;
 
-* Require partially applied functions to explicit list the arity too,
+* Require partially applied functions to explicitly list the arity too,
   hence `fun foo(X)` has to be written as: `fun foo(X)/0`.
   `fun maps:get(username, _)` as `fun maps:get(username, _)/1`.
   If the version with arity is preferred, then the `fun` prefix could
@@ -237,7 +237,7 @@ Alternative Solutions
 =====================
 
 The solution above chose to extend the existing `fun` syntax and use
-`_` as a placeholder. Those exact details can be changed accordingly.
+`_` as a placeholder. The exact details can be changed accordingly.
 
 Note this EEP focuses on language changes, rather than runtime changes,
 because whatever solution is chosen must support configuration files,
